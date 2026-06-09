@@ -50,14 +50,32 @@ jobs:
         continue-on-error: true
         run: timeout 1200 python3 build.py --refresh
 
+      # busca o preço REAL (priceoverview + mediana + Δ 24h) do top-N por gold/$,
+      # para o site público não ficar só com estimativas. Respeita o throttle da Steam.
+      - name: Enriquece top-N (best-effort)
+        continue-on-error: true
+        run: timeout 1200 python3 build.py --enrich-top 25 --currency brl
+
       # gera o site PÚBLICO (somente leitura: sem botões de atualização pela web)
       - name: Gera o site (público)
         run: python3 build.py --public
 
+      # rede de segurança: falha o deploy se o build regredir
+      - name: Smoke test
+        run: python3 tests/smoke.py
+
       - name: Prepara artefato do Pages
         run: |
-          mkdir -p _site
+          mkdir -p _site/assets
           cp index.html _site/index.html
+          cp assets/favicon.svg _site/assets/favicon.svg
+
+      # rasteriza o card OG (SVG -> PNG) para preview ao compartilhar o link
+      - name: Gera imagem OG (best-effort)
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq librsvg2-bin
+          rsvg-convert -w 1200 -h 630 assets/og.svg -o _site/assets/og.png
 
       - uses: actions/upload-pages-artifact@v3
         with:

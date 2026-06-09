@@ -26,6 +26,7 @@ python3 build.py --enrich-top 25       # preço real do top-25 (BRL por padrão)
 python3 build.py --enrich-top 25 --currency usd
 python3 build.py price "Eclipse Amulet (Arcana) A"          # 1 item na hora (BRL)
 python3 build.py price "Eclipse Amulet (Arcana) A" --currency usd
+python3 build.py --public              # build PÚBLICO (somente leitura, p/ o Pages)
 
 # Servidor local interativo (recomendado p/ atualizar pela página)
 python3 build.py serve                 # abre http://127.0.0.1:8765
@@ -121,6 +122,19 @@ O modo servidor foi desenhado para não comprometer a máquina nem as APIs consu
   **retry** dos itens limitados numa 2ª passada (os sem dados ganham carimbo de tempo p/ não serem
   reconsultados antes do frescor expirar).
 - **Anti-XSS**: nomes são escapados no render e o JSON embutido neutraliza `</script>`.
+
+## Publicação (GitHub Pages)
+
+Site online: **https://filipefont.github.io/tbh-market-tool/**
+
+- Publicado automaticamente pelo workflow `.github/workflows/publish.yml` — a cada push na
+  `main`, a cada 2h (cron) e sob demanda (botão **Run workflow**).
+- A Action faz `--refresh` (bulk) + `--enrich-top` (preço real do topo) e gera o site com
+  `--public`. O build público é **somente leitura**: não expõe os botões de atualização
+  (esses só existem no `serve` local) e mostra o **horário da última atualização**.
+- Os dados (`data/`, incl. `history.db`) **não** são commitados de volta: persistem entre
+  execuções via `actions/cache`, então o histórico de Δ acumula sem inchar o git.
+- Antes do deploy roda `tests/smoke.py` como rede de segurança.
 
 ## Fontes
 

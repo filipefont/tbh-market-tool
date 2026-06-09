@@ -543,7 +543,21 @@ def attach_trends(rows, windows=(("chg24", 86400), ("chg7", 7 * 86400))):
 HTML_TEMPLATE = r"""<!doctype html>
 <html lang="pt-br"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TBH Market Tool</title>
+<title>TBH Market Tool — Itens × Mercado Steam</title>
+<meta name="description" content="Ranking dos itens do Task Bar Hero cruzados com o Mercado Steam: retorno em gold e em gold por real (gold/R$). Preços atualizados automaticamente.">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TBH Market Tool">
+<meta property="og:title" content="TBH Market Tool — Itens × Mercado Steam">
+<meta property="og:description" content="Ranking de itens do Task Bar Hero por retorno em gold e gold/R$, com preços do Mercado Steam.">
+<meta property="og:url" content="__SITE__/">
+<meta property="og:image" content="__SITE__/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="TBH Market Tool — Itens × Mercado Steam">
+<meta name="twitter:description" content="Ranking de itens do Task Bar Hero por retorno em gold e gold/R$.">
+<meta name="twitter:image" content="__SITE__/assets/og.png">
 <style>
   :root { color-scheme: dark; --row:#13151a; --row-alt:#161922; --row-hover:#1c2029; }
   * { box-sizing: border-box; }
@@ -1809,6 +1823,10 @@ function showLastUpdate(){
 """
 
 
+# URL pública do site (usada em og:url / og:image). Atualizar se migrar para domínio próprio.
+SITE_URL = "https://filipefont.github.io/tbh-market-tool"
+
+
 # Controles que só fazem sentido com o servidor local rodando (omitidos no build público
 # do Pages: lá a atualização de preços é feita só pela GitHub Action).
 SERVER_CONTROLS_HTML = """<div class="group">
@@ -1829,6 +1847,8 @@ def render_html(rows, brl_rate, token="", public=False):
     data = data.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     out = HTML_TEMPLATE
     for k, v in {
+        # URL pública (og:image/og:url) — trocar aqui se migrar para domínio próprio
+        "__SITE__": SITE_URL,
         # build público (Pages): sem controles de atualização; o servidor local mantém os botões
         "__SERVER_CONTROLS__": "" if public else SERVER_CONTROLS_HTML,
         "__PUBLIC__": "true" if public else "false",

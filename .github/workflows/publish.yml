@@ -1,18 +1,21 @@
 name: Build & Publish
 
-# Gera o index.html e publica no GitHub Pages.
+# Gera o index.html PÚBLICO (somente leitura) e publica no GitHub Pages.
 # - a cada push na main
-# - de tempos em tempos (cron) para manter os preços frescos
-# - manualmente (workflow_dispatch)
+# - a cada 2h (cron) para manter os preços frescos
+# - manualmente (workflow_dispatch → botão "Run workflow")
+#
+# Os dados (cache do bulk + history.db) NÃO são commitados de volta no repo:
+# persistem entre execuções via actions/cache, evitando inchar o histórico do git.
 on:
   push:
     branches: [main]
   schedule:
-    - cron: "0 */2 * * *"   # a cada 2h · troque para "0 * * * *" p/ de hora em hora
+    - cron: "0 */2 * * *"   # a cada 2h
   workflow_dispatch:
 
+# Permissões mínimas: só o necessário para publicar no Pages (sem contents: write).
 permissions:
-  contents: write   # commitar dados/histórico atualizados de volta no repo
   pages: write
   id-token: write
 
@@ -32,23 +35,24 @@ jobs:
         with:
           python-version: "3.12"
 
+      # carrega os dados acumulados (cache do bulk + history.db) da execução anterior.
+      # chave rolante por run_id; restore-keys casa o cache mais recente com prefixo "data-".
+      - name: Restaura dados (cache)
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: data-${{ github.run_id }}
+          restore-keys: |
+            data-
+
       # rebaixa o bulk da Steam (best-effort: se falhar/limitar, segue com o cache)
       - name: Atualiza preços (best-effort)
         continue-on-error: true
         run: timeout 1200 python3 build.py --refresh
 
-      # sempre regenera o index.html a partir do cache mais recente
-      - name: Gera o site
-        run: python3 build.py
-
-      # persiste cache + histórico (history.db) p/ o Δ acumular entre execuções
-      - name: Commit dos dados atualizados
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data index.html
-          git commit -m "chore: refresh automático de preços" || echo "nada a commitar"
-          git push || echo "sem mudanças para enviar"
+      # gera o site PÚBLICO (somente leitura: sem botões de atualização pela web)
+      - name: Gera o site (público)
+        run: python3 build.py --public
 
       - name: Prepara artefato do Pages
         run: |

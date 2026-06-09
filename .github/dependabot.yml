@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # Mantém as GitHub Actions do workflow (checkout, setup-python, cache,
+  # upload-pages-artifact, deploy-pages) atualizadas com patches de segurança.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"

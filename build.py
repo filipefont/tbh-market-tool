@@ -743,7 +743,7 @@ HTML_TEMPLATE = r"""<!doctype html>
 <header>
   <h1>TBH Market Tool — Itens × Mercado Steam</h1>
   <div class="meta">
-    <span class="chip" data-tip="data/hora em que o ranking (bulk) foi gerado">📅 bulk: __GENERATED__</span>
+    <span class="chip" data-tip="data/hora em que o ranking (bulk) foi gerado — horário do build (UTC no GitHub Actions); veja o horário local em 'preços atualizados'">📅 bulk: __GENERATED__</span>
     <span class="chip"><span id="count">__N__</span> itens</span>
     <span id="status" aria-live="polite"><span class="dot off"></span>verificando servidor…</span>
   </div>
@@ -779,16 +779,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       <button data-r="low" class="on">menor venda</button><button data-r="med">mediana</button>
     </div>
   </div>
-  <div class="group">
-    <button id="calib" disabled aria-label="calibrar taxa"
-        title="estima a taxa USD→BRL a partir de uma amostra real da Steam">📐 Calibrar taxa</button>
-    <button id="refreshVisible" disabled aria-label="buscar preço real dos itens visíveis"
-        title="busca o preço real de cada item visível (modo servidor)">🎯 Preço real dos visíveis</button>
-    <button id="autoBtn" class="toggle" disabled aria-pressed="false" aria-label="atualização automática priorizada"
-        title="atualiza preços em segundo plano, priorizando favoritos · TTL escalonado por liquidez · respeita o limite da Steam">🔁 Auto</button>
-    <button id="refresh" aria-label="atualizar mercado"
-        title="rebaixa todos os preços do mercado (modo servidor)">🔄 Atualizar mercado</button>
-  </div>
+  __SERVER_CONTROLS__
 </div>
 <div id="activeFilters" aria-label="filtros ativos"></div>
 <div class="wrap">
@@ -818,6 +809,8 @@ HTML_TEMPLATE = r"""<!doctype html>
 <script>
 let DATA = __DATA__;
 const TOKEN = "__TOKEN__";
+const PUBLIC = __PUBLIC__;          // build do Pages: somente leitura (sem atualização pela web)
+const GEN_EPOCH = __GEN_EPOCH__;    // epoch (s) em que o site/preços foram gerados
 const $ = id => document.getElementById(id);
 const fmt = n => (n==null ? "—" : Math.round(n).toLocaleString("pt-BR"));
 const esc = s => { const d=document.createElement("div"); d.textContent=s??""; return d.innerHTML; };
@@ -893,13 +886,13 @@ function updateHeaders(){
 // trava/destrava os botões de ação enquanto um trabalho roda (espelha a regra do servidor)
 function lockJobs(activeId){
   jobBusy = true;
-  ["refresh","refreshVisible","calib"].forEach(id=>{ if(id!==activeId) $(id).disabled = true; });
+  ["refresh","refreshVisible","calib"].forEach(id=>{ const el=$(id); if(el && id!==activeId) el.disabled = true; });
   render();   // desabilita também os ↻ por linha
 }
 function unlockJobs(){
   jobBusy = false;
-  $("refresh").disabled = false;
-  $("calib").disabled = !serverOn;
+  const _r=$("refresh"); if(_r) _r.disabled = false;
+  const _c=$("calib"); if(_c) _c.disabled = !serverOn;
   render();   // reavalia o botão de lote e reabilita os ↻
 }
 
@@ -1626,7 +1619,7 @@ async function refreshAll(){
     }, 2000);
   }catch(e){ done("Falha: "+e.message, "error"); }
 }
-$("refresh").onclick = refreshAll;
+$("refresh")?.addEventListener("click", refreshAll);
 
 // rótulo/estado do botão conforme quantos itens visíveis precisam de (re)busca (5.4)
 function updateEnrichBtn(rows){
@@ -1698,7 +1691,7 @@ async function refreshVisible(ev){
     }
   }, 1500);
 }
-$("refreshVisible").onclick = refreshVisible;
+$("refreshVisible")?.addEventListener("click", refreshVisible);
 
 // ---- Atualização automática priorizada (5.x) ------------------------------------------
 // Loop em segundo plano que mantém os preços frescos sem você clicar nada, priorizando o
@@ -1764,7 +1757,7 @@ async function autoStep(){
     }catch(e){ clearInterval(autoPoll); autoPoll=null; unlockJobs(); }
   }, 1500);
 }
-$("autoBtn").onclick = ()=>{ if(!serverOn){ toast("Disponível só no modo servidor.", "info"); return; } setAuto(!autoOn); };
+$("autoBtn")?.addEventListener("click", ()=>{ if(!serverOn){ toast("Disponível só no modo servidor.", "info"); return; } setAuto(!autoOn); });
 // relógio do loop: confere periodicamente; o ritmo real é ditado pelo throttle do servidor
 autoTick=setInterval(()=>{ if(autoOn && serverOn && !jobBusy && !autoPoll) autoStep(); }, 8000);
 
@@ -1781,9 +1774,22 @@ async function calibrate(){
   }catch(e){ toast("Falha ao calibrar: "+e.message, "error"); }
   btn.textContent=old; unlockJobs();
 }
-$("calib").onclick = calibrate;
+$("calib")?.addEventListener("click", calibrate);
 
+// rótulo de "última atualização" (build público): data local do visitante + "há Xh"
+function showLastUpdate(){
+  const a = ago(GEN_EPOCH);
+  const when = new Date(GEN_EPOCH*1000).toLocaleString("pt-BR");
+  const rel = a ? (a==="agora" ? "agora mesmo" : "há "+a) : "";
+  $("status").innerHTML = `<span class="dot ok"></span>somente leitura · preços atualizados ${rel} <span class="muted">(${when})</span>`;
+}
 (async function detectServer(){
+  if(PUBLIC){            // Pages: sem servidor, sem atualização pela web
+    serverOn = false;
+    showLastUpdate();
+    render();
+    return;
+  }
   try{
     await api("/api/ping");
     serverOn = true;
@@ -1803,13 +1809,31 @@ $("calib").onclick = calibrate;
 """
 
 
-def render_html(rows, brl_rate, token=""):
+# Controles que só fazem sentido com o servidor local rodando (omitidos no build público
+# do Pages: lá a atualização de preços é feita só pela GitHub Action).
+SERVER_CONTROLS_HTML = """<div class="group">
+    <button id="calib" disabled aria-label="calibrar taxa"
+        title="estima a taxa USD→BRL a partir de uma amostra real da Steam">📐 Calibrar taxa</button>
+    <button id="refreshVisible" disabled aria-label="buscar preço real dos itens visíveis"
+        title="busca o preço real de cada item visível (modo servidor)">🎯 Preço real dos visíveis</button>
+    <button id="autoBtn" class="toggle" disabled aria-pressed="false" aria-label="atualização automática priorizada"
+        title="atualiza preços em segundo plano, priorizando favoritos · TTL escalonado por liquidez · respeita o limite da Steam">🔁 Auto</button>
+    <button id="refresh" aria-label="atualizar mercado"
+        title="rebaixa todos os preços do mercado (modo servidor)">🔄 Atualizar mercado</button>
+  </div>"""
+
+
+def render_html(rows, brl_rate, token="", public=False):
     data = json.dumps(rows, ensure_ascii=False)
     # anti-XSS: impede quebra do </script> e injeção via conteúdo do JSON
     data = data.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     out = HTML_TEMPLATE
     for k, v in {
+        # build público (Pages): sem controles de atualização; o servidor local mantém os botões
+        "__SERVER_CONTROLS__": "" if public else SERVER_CONTROLS_HTML,
+        "__PUBLIC__": "true" if public else "false",
         "__GENERATED__": time.strftime("%Y-%m-%d %H:%M"),
+        "__GEN_EPOCH__": str(int(time.time())),
         "__N__": str(len(rows)),
         "__RATE__": f"{brl_rate:.2f}",
         "__TOKEN__": token,
@@ -1886,11 +1910,11 @@ def enrich(rows, top_n, curkey):
     record_history(_history_rows_from_updates(updates, "priceoverview"))
 
 
-def write_static(rows, brl_rate):
+def write_static(rows, brl_rate, public=False):
     rows.sort(key=lambda r: r["gold"] / r["usd"] if r["usd"] else 0, reverse=True)
     out = os.path.join(HERE, "index.html")
-    open(out, "w", encoding="utf-8").write(render_html(rows, brl_rate))
-    print(f"[ok] gerado: {out}")
+    open(out, "w", encoding="utf-8").write(render_html(rows, brl_rate, public=public))
+    print(f"[ok] gerado: {out}" + (" (público/somente leitura)" if public else ""))
 
 
 # --- Servidor local seguro ---------------------------------------------------------------
@@ -2190,6 +2214,8 @@ def _open_browser(url):
 def main():
     ap = argparse.ArgumentParser(description="TBH Market Tool")
     ap.add_argument("--refresh", action="store_true", help="rebaixa o bulk das APIs")
+    ap.add_argument("--public", action="store_true",
+                    help="build público (Pages): somente leitura, sem controles de atualização")
     ap.add_argument("--brl-rate", type=float, default=5.40, help="taxa USD->BRL p/ estimativa")
     ap.add_argument("--enrich-top", type=int, default=0, metavar="N",
                     help="preço real (priceoverview) das N melhores por gold/$")
@@ -2232,7 +2258,7 @@ def main():
             print("[calibrate] sem amostra; mantendo taxa padrão")
     if args.enrich_top:
         enrich(rows, args.enrich_top, args.currency)
-    write_static(rows, brl_rate)
+    write_static(rows, brl_rate, args.public)
     print("\nTop 10 por gold/$ (bulk):")
     for r in rows[:10]:
         print(f"  {r['gold'] / r['usd']:>12,.0f}/$  ${r['usd']:>6.2f}  {r['gold']:>16,}  {r['name']}")

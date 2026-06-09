@@ -1,0 +1,70 @@
+name: Build & Publish
+
+# Gera o index.html e publica no GitHub Pages.
+# - a cada push na main
+# - de tempos em tempos (cron) para manter os preços frescos
+# - manualmente (workflow_dispatch)
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 */2 * * *"   # a cada 2h · troque para "0 * * * *" p/ de hora em hora
+  workflow_dispatch:
+
+permissions:
+  contents: write   # commitar dados/histórico atualizados de volta no repo
+  pages: write
+  id-token: write
+
+# uma publicação por vez; não cancela uma em andamento
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # rebaixa o bulk da Steam (best-effort: se falhar/limitar, segue com o cache)
+      - name: Atualiza preços (best-effort)
+        continue-on-error: true
+        run: timeout 1200 python3 build.py --refresh
+
+      # sempre regenera o index.html a partir do cache mais recente
+      - name: Gera o site
+        run: python3 build.py
+
+      # persiste cache + histórico (history.db) p/ o Δ acumular entre execuções
+      - name: Commit dos dados atualizados
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data index.html
+          git commit -m "chore: refresh automático de preços" || echo "nada a commitar"
+          git push || echo "sem mudanças para enviar"
+
+      - name: Prepara artefato do Pages
+        run: |
+          mkdir -p _site
+          cp index.html _site/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

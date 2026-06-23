@@ -48,6 +48,24 @@ check("__SERVER_CONTROLS__" not in pub, "placeholder __SERVER_CONTROLS__ não su
 check('id="refresh"' not in pub, "build público vazou botão de atualização")
 check("og:image" in pub and "__SITE__" not in pub, "build público sem og:image válida")
 
+# 4) parser de ENCOMENDAS (order book) — fixture sintética com o escape duplo da página SSR.
+# Protege contra regressão no regex/unescape se a Steam mexer no SSR (.spec §5.5).
+# dados vêm ANTES da queryKey no payload desidratado (a âncora confirma o item)
+_blob = (
+    r'{\"amtMaxBuyOrder\":242,\"amtMinSellOrder\":36686,\"eCurrency\":7,'
+    + r'\"cBuyOrders\":5269,\"cSellOrders\":2,'
+    + r'\"rgCompactBuyOrders\":[242,100,140,10],\"rgCompactSellOrders\":[36686,1]}'
+    + r'...\"queryKey\":[\"market\",\"orderbook\",%d,\"Widget A\"]...' % build.APPID)
+bk = build.parse_orderbook(_blob, "Widget A")
+check(bk is not None, "parse_orderbook não extraiu o order book da fixture (SSR mudou?)")
+if bk:
+    check(bk["buyMax"] == 2.42, f"parse_orderbook buyMax errado: {bk.get('buyMax')}")
+    check(bk["buyOrders"] == 5269, f"parse_orderbook buyOrders errado: {bk.get('buyOrders')}")
+    check(bk["cur"] == 7, f"parse_orderbook moeda errada: {bk.get('cur')}")
+    check(bk["buyBook"][:2] == [[2.42, 100], [1.4, 10]], "parse_orderbook book de compra errado")
+check(build.parse_orderbook("sem order book aqui", "Widget A") is None,
+      "parse_orderbook deveria retornar None sem âncora")
+
 if fails:
     print("SMOKE: FALHOU")
     for f in fails:

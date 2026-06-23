@@ -56,7 +56,15 @@ jobs:
         continue-on-error: true
         run: timeout 1200 python3 build.py --enrich-top 25 --currency brl
 
+      # coleta as ENCOMENDAS (buy orders) dos itens mais líquidos: maior encomenda + demanda,
+      # p/ o ranking "melhor p/ vender por $". Persistido em data/orderbook.json (vai p/ o cache).
+      # NB: o runner é US -> o order book costuma vir em USD; o front-end converte pela taxa.
+      - name: Coleta encomendas (best-effort)
+        continue-on-error: true
+        run: timeout 1200 python3 build.py --orderbook-top 30
+
       # gera o site PÚBLICO (somente leitura: sem botões de atualização pela web)
+      # roda por último p/ embutir os dados de preço e encomenda já coletados acima.
       - name: Gera o site (público)
         run: python3 build.py --public
 

@@ -36,20 +36,28 @@ import urllib.request
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "data")
 
+APPID = 3678970  # TBH: Task Bar Hero (Steam app)
 ITEMS_URL = "https://www.taskbarherowiki.com/data/items.json"
 STEAM_URL = (
     "https://steamcommunity.com/market/search/render/"
-    "?appid=3678970&norender=1&count=100&start={start}"
+    f"?appid={APPID}&norender=1&count=100&start={{start}}"
 )
 PRICEOVERVIEW_URL = (
     "https://steamcommunity.com/market/priceoverview/"
-    "?appid=3678970&currency={currency}&market_hash_name={name}"
+    f"?appid={APPID}&currency={{currency}}&market_hash_name={{name}}"
 )
+# Página de listagem (SSR): embute o order book (encomendas/buy orders) num blob de
+# hidratação. É a fonte das encomendas — ver .spec/encomendas-steam.md.
+LISTING_URL = f"https://steamcommunity.com/market/listings/{APPID}/{{name}}"
 CURRENCIES = {"usd": 1, "brl": 7}  # códigos de moeda da Steam
+CUR_BY_CODE = {v: k for k, v in CURRENCIES.items()}  # 7 -> "brl", 1 -> "usd"
 ITEMS_CACHE = os.path.join(DATA, "items.json")
 STEAM_CACHE = os.path.join(DATA, "steam_market.json")
 ENRICHED_CACHE = os.path.join(DATA, "enriched.json")
+ORDERBOOK_CACHE = os.path.join(DATA, "orderbook.json")  # encomendas (buy orders) por item/moeda
 HISTORY_DB = os.path.join(DATA, "history.db")  # série histórica própria (snapshots de preço)
+BOOK_DEPTH = 12       # nº de níveis de preço guardados do book de compra (mantém o cache enxuto)
+ORDERBOOK_TTL = 1800  # segundos: não re-busca o order book do mesmo item nesse intervalo
 HEADERS = {"User-Agent": "TBH-Market-Tool/1.0 (uso pessoal)"}
 
 # --- Proteção da API da Steam: throttle global ADAPTATIVO + cooldown no 429 ----------------
@@ -127,7 +135,10 @@ def _retry_after_seconds(err):
         return None
 
 
-def fetch_json(url, retries=4, backoff=3.0, throttle=False):
+def _fetch(url, parser, retries=4, backoff=3.0, throttle=False):
+    """Loop de busca com throttle adaptativo + backoff/cooldown. `parser(resp)` extrai o
+    corpo (json.load p/ JSON, .read().decode p/ HTML) — assim JSON e HTML compartilham a
+    mesma proteção de rate-limit da Steam."""
     last = None
     for attempt in range(retries):
         try:
@@ -135,7 +146,7 @@ def fetch_json(url, retries=4, backoff=3.0, throttle=False):
                 _throttle()
             req = urllib.request.Request(url, headers=HEADERS)
             with urllib.request.urlopen(req, timeout=30) as r:
-                data = json.load(r)
+                data = parser(r)
             if throttle:
                 _note_ok()
             return data
@@ -157,6 +168,14 @@ def fetch_json(url, retries=4, backoff=3.0, throttle=False):
             print(f"    ! falha ({e}); retry em {wait:.0f}s")
             time.sleep(wait)
     raise RuntimeError(f"Falha ao buscar {url}: {last}")
+
+
+def fetch_json(url, retries=4, backoff=3.0, throttle=False):
+    return _fetch(url, json.load, retries, backoff, throttle)
+
+
+def fetch_text(url, retries=4, backoff=3.0, throttle=False):
+    return _fetch(url, lambda r: r.read().decode("utf-8", "replace"), retries, backoff, throttle)
 
 
 def parse_money(text):
@@ -226,6 +245,79 @@ def listings_overview(name, curkey="brl"):
     if status == "nodata" or not po or po.get("low") is None:
         return {"buyable": False, "low": None, "vol": None, "fetchedAt": now}
     return {"buyable": True, "low": po["low"], "vol": po.get("vol"), "fetchedAt": now}
+
+
+# --- Encomendas / buy orders (order book) ------------------------------------------------
+# A página de listagem SSR embute o order book num blob React Query (chave
+# ["market","orderbook",APPID,hash_name]). Daí saem: maior encomenda, total de encomendas
+# (demanda) e o book de compra/venda. Sem nameid, por hash_name. Ver .spec/encomendas-steam.md.
+ORDERBOOK_RE = re.compile(
+    r'"amtMaxBuyOrder":(?P<max>-?\d+),'
+    r'"amtMinSellOrder":(?P<min>-?\d+),'
+    r'"eCurrency":(?P<cur>\d+),'
+    r'"cBuyOrders":(?P<nbuy>\d+),'
+    r'"cSellOrders":(?P<nsell>\d+),'
+    r'"rgCompactBuyOrders":\[(?P<buy>[\d,]*)\],'
+    r'"rgCompactSellOrders":\[(?P<sell>[\d,]*)\]')
+
+
+def _compact_pairs(s):
+    """'242,100,129,2' -> [[2.42,100],[1.29,2]] (centavos -> moeda, em pares preço/qtd)."""
+    nums = [int(x) for x in s.split(",") if x != ""]
+    return [[nums[i] / 100.0, nums[i + 1]] for i in range(0, len(nums) - 1, 2)]
+
+
+def parse_orderbook(html, name):
+    """Extrai o order book do item `name` do HTML da página de listagem. Retorna o dict de
+    encomendas (com `cur` = código de moeda da Steam) ou None se o item não está na página
+    ou o formato mudou. Robusto: confirma o item pela âncora da queryKey e casa o bloco de
+    dados imediatamente anterior (os dados vêm ANTES da queryKey no payload desidratado)."""
+    # O blob desidratado é uma string JSON DENTRO do JSON da página -> aspas vêm escapadas
+    # (\" e até \\\"). Normaliza removendo as barras antes das aspas p/ casar o conteúdo.
+    html = re.sub(r'\\+"', '"', html)
+    anchor = f'"orderbook",{APPID},"{name}"'
+    pos = html.find(anchor)
+    if pos < 0:
+        return None
+    m = None
+    for m in ORDERBOOK_RE.finditer(html, 0, pos):  # último match antes da âncora
+        pass
+    if not m:
+        return None
+    buy = _compact_pairs(m["buy"])
+    return {
+        "cur": int(m["cur"]),
+        "buyMax": int(m["max"]) / 100.0,
+        "buyOrders": int(m["nbuy"]),
+        "sellMin": int(m["min"]) / 100.0,
+        "sellOrders": int(m["nsell"]),
+        "buyBook": buy[:BOOK_DEPTH],
+        "buyNotional": round(sum(p * q for p, q in buy), 2),
+    }
+
+
+def _order_book(name):
+    """Busca o order book de `name`. Retorna (status, curkey, book):
+       'ok'     -> book preenchido na moeda `curkey` (derivada do eCurrency da página)
+       'nodata' -> página respondeu mas sem order book (item sem mercado/formato mudou)
+       'error'  -> falha de rede / rate-limit (transitório)."""
+    url = LISTING_URL.format(name=urllib.parse.quote(name))
+    try:
+        html = fetch_text(url, retries=3, backoff=4.0, throttle=True)
+    except RuntimeError:
+        return "error", None, None
+    book = parse_orderbook(html, name)
+    if not book:
+        return "nodata", None, None
+    curkey = CUR_BY_CODE.get(book.pop("cur"), "usd")  # moeda da geolocalização do fetch
+    book["fetchedAt"] = int(time.time())
+    return "ok", curkey, book
+
+
+def order_book(name):
+    """Conveniência: (curkey, book) ou (None, None). Usado por CLI/diagnóstico."""
+    status, curkey, book = _order_book(name)
+    return (curkey, book) if status == "ok" else (None, None)
 
 
 # --- Caches ------------------------------------------------------------------------------
@@ -306,6 +398,47 @@ def merge_enriched(updates):
     return enriched
 
 
+# --- Cache do order book (encomendas) — mesma disciplina atômica/lock do enriched ---------
+_orderbook_lock = threading.Lock()
+
+
+def load_orderbook():
+    if os.path.exists(ORDERBOOK_CACHE):
+        try:
+            return json.load(open(ORDERBOOK_CACHE, encoding="utf-8"))
+        except (ValueError, OSError):
+            return {}
+    return {}
+
+
+def save_orderbook(book):
+    tmp = ORDERBOOK_CACHE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(book, f, ensure_ascii=False)
+    os.replace(tmp, ORDERBOOK_CACHE)
+
+
+def merge_orderbook(updates):
+    """Aplica {name: {curkey: book}} sobre orderbook.json, sob lock, e registra no histórico."""
+    with _orderbook_lock:
+        book = load_orderbook()
+        for name, bycur in updates.items():
+            book.setdefault(name, {}).update(bycur)
+        save_orderbook(book)
+    record_order_history(updates)  # fora do lock do JSON
+    return book
+
+
+def is_book_fresh(name, ttl, book=None):
+    """True se o order book do item foi buscado há menos de `ttl` s (em qualquer moeda)."""
+    book = load_orderbook() if book is None else book
+    for entry in (book.get(name) or {}).values():
+        age = price_age(entry)
+        if age is not None and age < ttl:
+            return True
+    return False
+
+
 # --- Histórico de preços (SQLite) --------------------------------------------------------
 # SEGURANÇA: TODAS as queries usam placeholders (?), nunca interpolação de string -> imune a
 # SQL injection. Nomes de tabela/coluna são literais fixos; entradas externas (name, currency)
@@ -324,6 +457,14 @@ def init_history():
                 "low REAL, med REAL, vol INTEGER, source TEXT NOT NULL)")
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS ix_hist ON price_history(name, currency, ts)")
+            # série de encomendas: evolução de demanda (buy_orders) e maior encomenda (buy_max)
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS order_history ("
+                "name TEXT NOT NULL, currency TEXT NOT NULL, ts INTEGER NOT NULL, "
+                "buy_max REAL, buy_orders INTEGER, sell_min REAL, sell_orders INTEGER, "
+                "source TEXT NOT NULL)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS ix_ohist ON order_history(name, currency, ts)")
     except sqlite3.Error as e:  # pragma: no cover
         print(f"    ! histórico indisponível ({e})")
 
@@ -354,6 +495,27 @@ def record_history(rows):
                 "VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
     except sqlite3.Error as e:  # pragma: no cover
         print(f"    ! histórico não gravado ({e})")
+
+
+def record_order_history(updates, source="orderbook"):
+    """Grava pontos de encomendas a partir de {name: {curkey: book}}. Best-effort."""
+    rows, now = [], int(time.time())
+    for name, bycur in (updates or {}).items():
+        for curkey, bk in bycur.items():
+            if not isinstance(bk, dict):
+                continue
+            rows.append((name, curkey, int(bk.get("fetchedAt") or now),
+                         bk.get("buyMax"), bk.get("buyOrders"),
+                         bk.get("sellMin"), bk.get("sellOrders"), source))
+    if not rows:
+        return
+    try:
+        with _history_lock, sqlite3.connect(HISTORY_DB) as conn:
+            conn.executemany(
+                "INSERT INTO order_history(name, currency, ts, buy_max, buy_orders, "
+                "sell_min, sell_orders, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", rows)
+    except sqlite3.Error as e:  # pragma: no cover
+        print(f"    ! histórico de encomendas não gravado ({e})")
 
 
 def record_bulk_history(rows):
@@ -427,7 +589,7 @@ def _item_attrs(it):
     return attrs
 
 
-def _row_from_item(it, name, usd, listings, enriched):
+def _row_from_item(it, name, usd, listings, enriched, book=None):
     """Monta uma linha. usd=None => item sem preço do bulk (marcado noBulk)."""
     row = {
         "name": name,
@@ -440,6 +602,7 @@ def _row_from_item(it, name, usd, listings, enriched):
         "usd": round(usd, 4) if usd else None,
         "listings": listings or 0,
         "real": enriched.get(name),  # {usd:{...}, brl:{...}} ou None
+        "book": (book or {}).get(name),  # encomendas: {brl:{buyMax,buyOrders,...}} ou None
         # metadados do item (colunas/filtros/tooltip na página)
         "gearType": it.get("gearType"),     # SWORD, BOW, SHIELD, BRACER, ORB...
         "gearGroup": it.get("gearGroup"),   # WEAPON / ARMOR / ACCESSORY
@@ -461,7 +624,7 @@ def _row_from_item(it, name, usd, listings, enriched):
     return row
 
 
-def build_rows(items, steam, enriched=None):
+def build_rows(items, steam, enriched=None, book=None):
     by_key = {}
     for it in items:
         by_key.setdefault(join_key(it), it)
@@ -473,6 +636,7 @@ def build_rows(items, steam, enriched=None):
             best[n] = s
 
     enriched = enriched or {}
+    book = book if book is not None else load_orderbook()
     rows, unmatched, seen = [], [], set()
     # 1) itens com preço do bulk (snapshot da Steam)
     for name, s in best.items():
@@ -484,7 +648,7 @@ def build_rows(items, steam, enriched=None):
         usd = (s.get("sell_price") or 0) / 100.0  # vem em centavos
         if not gold or usd <= 0:
             continue
-        rows.append(_row_from_item(it, name, usd, s.get("sell_listings") or 0, enriched))
+        rows.append(_row_from_item(it, name, usd, s.get("sell_listings") or 0, enriched, book))
         seen.add(name)
     # 2) tradáveis com gold que NÃO entraram no bulk: aparecem sem preço (busca sob demanda)
     for it in items:
@@ -494,7 +658,7 @@ def build_rows(items, steam, enriched=None):
         if name in seen:
             continue
         seen.add(name)
-        rows.append(_row_from_item(it, name, None, 0, enriched))
+        rows.append(_row_from_item(it, name, None, 0, enriched, book))
     attach_trends(rows)   # Δ de preço (▲▼ %) a partir do histórico (USD)
     return rows, unmatched
 
@@ -777,6 +941,7 @@ HTML_TEMPLATE = r"""<!doctype html>
       <option value="">disponibilidade: todos</option>
       <option value="vol">só com giro 24h</option>
       <option value="offer">esconder sem oferta</option>
+      <option value="buy">só com encomenda</option>
     </select>
     <span class="chip" id="resultcount" data-tip="itens visíveis / total"></span>
     <button id="favFilter" class="toggle" aria-pressed="false"
@@ -811,6 +976,8 @@ HTML_TEMPLATE = r"""<!doctype html>
   <th class="real" data-k="goldPerReal" tabindex="0"><span class="hlbl" data-sfx="(real)">Gold / moeda</span><span class="hint" data-tip="gold ÷ preço real">ⓘ</span></th>
   <th data-k="vol" tabindex="0">Vol 24h<span class="hint" data-tip="unidades vendidas nas últimas 24h — liquidez">ⓘ</span></th>
   <th data-k="listings" tabindex="0">Listagens<span class="hint" data-tip="quantidade à venda agora">ⓘ</span></th>
+  <th class="book" data-k="buyMax" tabindex="0">Maior enc.<span class="hint" data-tip="maior ENCOMENDA (buy order) ativa, na moeda escolhida — o preço que um comprador paga AGORA. Vender nela vira saldo na hora. Passe o mouse p/ o líquido (−15% taxa Steam) e o spread">ⓘ</span></th>
+  <th class="book" data-k="buyOrders" tabindex="0">Encomendas<span class="hint" data-tip="total de encomendas (demanda agregada): quantas unidades há querendo comprar. Maior = mais fácil liquidar por dinheiro sem derrubar o preço">ⓘ</span></th>
   <th data-k="liq" tabindex="0">Disp.<span class="hint" data-tip="disponibilidade/liquidez: bolinha pela heurística (listagens + volume); 🛒 confirma ofertas reais compráveis ao vivo">ⓘ</span></th>
 </tr></thead><tbody></tbody></table>
 </div>
@@ -819,7 +986,8 @@ HTML_TEMPLATE = r"""<!doctype html>
 <aside id="detail" role="dialog" aria-modal="true" aria-label="detalhes do item" hidden></aside>
 <div id="tip" role="tooltip"></div>
 <footer>Fonte itens: taskbarherowiki.com · preços: steamcommunity.com/market (appid 3678970).
-  "est." = menor venda do bulk (USD) convertida pela taxa · "real" = priceoverview (mediana) na moeda.</footer>
+  "est." = menor venda do bulk (USD) convertida pela taxa · "real" = priceoverview (mediana) na moeda ·
+  "Maior enc." = maior encomenda (buy order) ativa, "Encomendas" = demanda agregada — ordene por elas p/ achar o melhor item p/ vender por $.</footer>
 <script>
 let DATA = __DATA__;
 const TOKEN = "__TOKEN__";
@@ -829,7 +997,7 @@ const $ = id => document.getElementById(id);
 const fmt = n => (n==null ? "—" : Math.round(n).toLocaleString("pt-BR"));
 const esc = s => { const d=document.createElement("div"); d.textContent=s??""; return d.innerHTML; };
 const tbody = document.querySelector("#t tbody");
-const BASE_COLS = 14;       // colunas fixas; +1 por atributo filtrado
+const BASE_COLS = 16;       // colunas fixas; +1 por atributo filtrado
 const colCount = () => BASE_COLS + selAttrs.size;
 const MARKET_FEE = 0.15;    // taxa estimada do Mercado Steam (~13–15%) p/ valor líquido ao vender
 
@@ -1127,15 +1295,48 @@ function realInfo(d){
   return {obj: native || null, converted:false};   // native pode ser placeholder "sem dados"
 }
 function pickPrice(o){ if(!o) return null; return realMode==="low" ? (o.low ?? o.med) : (o.med ?? o.low); }
+// order book (encomendas) na moeda atual; converte preços da outra moeda pela taxa.
+// Quantidades (buyOrders, qtd do book) NÃO se convertem — são contagens.
+function bookInfo(d){
+  const b = d.book || {};
+  const native = b[cur];
+  if(native) return {obj:native, converted:false};
+  const otherKey = cur==="usd" ? "brl" : "usd";
+  const other = b[otherKey];
+  if(other){
+    const f = cur==="usd" ? (rate>0 ? 1/rate : 0) : rate;
+    return { obj:{ ...other,
+              buyMax: other.buyMax!=null ? other.buyMax*f : null,
+              sellMin: other.sellMin!=null ? other.sellMin*f : null,
+              buyNotional: other.buyNotional!=null ? other.buyNotional*f : null,
+              buyBook: (other.buyBook||[]).map(([p,q])=>[p*f,q]) },
+             converted:true, from:otherKey };
+  }
+  return {obj:null, converted:false};
+}
 function derive(d){
   const pe = priceEst(d);
   const ri = realInfo(d), pr = pickPrice(ri.obj);
   const vol = ri.obj?.vol ?? null;
+  const bi = bookInfo(d), bk = bi.obj;
+  const buyMax = bk ? bk.buyMax : null;
+  const buyOrders = bk ? bk.buyOrders : null;
+  const sellMin = bk ? (bk.sellMin ?? null) : null;
+  const topQty = (bk && bk.buyBook && bk.buyBook[0]) ? bk.buyBook[0][1] : null;
+  const buyNet = buyMax!=null ? buyMax*(1-MARKET_FEE) : null;           // líquido (−taxa Steam)
+  // score "melhor p/ vender por $": preço líquido da encomenda PONDERADO pela demanda (log)
+  const buyScore = (buyNet!=null && buyOrders) ? buyNet*Math.log10(buyOrders+1) : null;
   return { ...d, priceEst:pe, goldPerEst: (pe!=null && pe>0) ? d.gold/pe : null,
            priceReal:pr, goldPerReal: pr>0 ? d.gold/pr : null,
            realConverted: ri.converted, realFrom: ri.from||null,
            vol, fetchedAt: ri.obj?.fetchedAt ?? null,
-           liq: liqScore(d.listings, vol) };   // p/ ordenar pela coluna Disp.
+           liq: liqScore(d.listings, vol),     // p/ ordenar pela coluna Disp.
+           buyMax, buyOrders, sellMin, buyNet, buyScore,
+           buyTopValue: (buyMax!=null && topQty!=null) ? buyMax*topQty : null,
+           buyNotional: bk ? (bk.buyNotional ?? null) : null,
+           buyBook: bk ? (bk.buyBook || []) : [],
+           buyConverted: bi.converted,
+           spreadPct: (sellMin && buyMax!=null && sellMin>0) ? Math.round((sellMin-buyMax)/sellMin*100) : null };
 }
 // tooltip do item: campos que não viraram coluna (parte, variante, grupo, tradável, slots, único)
 function detailTitle(d){
@@ -1159,6 +1360,7 @@ function steamUrl(name){
 function availPass(d, mode){
   if(!mode) return true;
   if(mode==="offer") return !(d.listings<=0 || (d.buy && d.buy.buyable===false));
+  if(mode==="buy") return d.buyOrders>0;   // só itens com encomenda ativa conhecida
   if(d.fetchedAt==null) return true;   // sem consulta real → desconhecido, não esconde
   return d.vol>0;                       // giro 24h confirmado
 }
@@ -1261,6 +1463,10 @@ function render(){
     // valor líquido ao VENDER no mercado (após ~${MARKET_FEE*100}% de taxa) — informativo
     const netTitle = hasReal
       ? ` title="líquido ao vender no mercado: ${sym()}${(d.priceReal*(1-MARKET_FEE)).toFixed(2)} (−${Math.round(MARKET_FEE*100)}% taxa Steam)"` : "";
+    // encomendas (buy orders): maior encomenda + demanda
+    const bConv = d.buyConverted ? `<span class="conv" title="encomenda convertida da outra moeda pela taxa">≈</span> ` : "";
+    const buyTitle = d.buyMax!=null
+      ? ` title="líquido ao vender na encomenda: ${sym()}${d.buyNet.toFixed(2)} (−${Math.round(MARKET_FEE*100)}% taxa Steam)${d.spreadPct!=null?` · spread compra/venda ${d.spreadPct}%`:''}${d.buyNotional!=null?` · book de compra ${sym()}${d.buyNotional.toFixed(2)}`:''}"` : "";
     // disponibilidade/liquidez: heurística (bolinha) + verificação ao vivo (🛒)
     const score = liqScore(d.listings, d.vol);
     const liqDot = `<span class="liq ${liqClass(score)}" title="liquidez ${score}/100 — ${fmt(d.listings)} listagens${d.vol!=null?`, vol 24h ${fmt(d.vol)}`:''}"></span>`;
@@ -1288,6 +1494,8 @@ function render(){
       <td class="ppr real">${d.goldPerReal!=null?`<span class="abbr" data-tip="${fmt(d.goldPerReal)}">${fmtAbbr(d.goldPerReal)}</span>`:"—"}</td>
       <td class="${(d.vol!=null&&d.vol<5)?'low':''}">${fmt(d.vol)}${volWarn}</td>
       <td class="${d.listings<10?'low':''}">${fmt(d.listings)}${listWarn}</td>
+      <td class="money book"${buyTitle}>${d.buyMax!=null?(bConv+sym()+d.buyMax.toFixed(2)):'—'}</td>
+      <td class="${(d.buyOrders!=null&&d.buyOrders<5)?'low':''}"${buyTitle}>${d.buyOrders!=null?fmt(d.buyOrders):'—'}</td>
       <td>${liqDot}${buyMark}${buyBtn}</td>
     </tr>`; }).join("");
 
@@ -1506,6 +1714,13 @@ function openDetail(raw){
     if(d.goldPerReal!=null) econ.push([`Gold / ${sym().trim()} (real)`, fmt(d.goldPerReal)]); }
   if(d.vol!=null) econ.push(["Vol 24h", fmt(d.vol)]);
   econ.push(["Listagens", fmt(d.listings)]);
+  if(d.buyMax!=null){
+    econ.push(["Maior encomenda", (d.buyConverted?"≈ ":"")+sym()+d.buyMax.toFixed(2)]);
+    econ.push(["Líquido na encomenda", sym()+d.buyNet.toFixed(2)+` (−${Math.round(MARKET_FEE*100)}% taxa)`]);
+  }
+  if(d.buyOrders!=null) econ.push(["Encomendas (demanda)", fmt(d.buyOrders)]);
+  if(d.spreadPct!=null) econ.push(["Spread compra/venda", d.spreadPct+"%"]);
+  if(d.buyNotional!=null) econ.push(["Valor do book de compra", sym()+d.buyNotional.toFixed(2)]);
   const isFav=favs.has(d.name);
   $("detail").innerHTML = `
     <div class="dhead">
@@ -1930,6 +2145,63 @@ def enrich(rows, top_n, curkey):
     record_history(_history_rows_from_updates(updates, "priceoverview"))
 
 
+def _spread_pct(bk):
+    sm = bk.get("sellMin")
+    return round((sm - bk["buyMax"]) / sm * 100) if sm else None
+
+
+def enrich_orderbook(rows, top_n):
+    """Coleta as encomendas (buy orders) dos N itens mais líquidos (onde há demanda real).
+    A seleção é por nº de listagens — proxy de mercado ativo; sem book não dá p/ rankear por
+    demanda ainda. Respeita o TTL p/ não remartelar e o throttle global da Steam."""
+    book = load_orderbook()
+    candidates = sorted((r for r in rows if r.get("listings")),
+                        key=lambda r: r["listings"], reverse=True)
+    updates, done = {}, 0
+    print(f"\n[orderbook] encomendas dos {top_n} itens mais líquidos...")
+    for r in candidates:
+        if done >= top_n:
+            break
+        if is_book_fresh(r["name"], ORDERBOOK_TTL, book):
+            continue
+        status, curkey, bk = _order_book(r["name"])
+        if status != "ok":
+            print(f"  - {r['name']}: {status}")
+            continue
+        book.setdefault(r["name"], {})[curkey] = bk
+        updates.setdefault(r["name"], {})[curkey] = bk
+        r["book"] = book[r["name"]]
+        sp = _spread_pct(bk)
+        print(f"  + {r['name']}: maior enc {bk['buyMax']:.2f} {curkey.upper()} · "
+              f"{bk['buyOrders']} enc · spread {sp if sp is not None else '—'}%")
+        done += 1
+    save_orderbook(book)
+    record_order_history(updates)
+    print(f"[orderbook] {done} itens com encomenda coletados")
+
+
+def cmd_book(names):
+    """Consulta ad-hoc das encomendas de 1+ itens (e persiste no cache + histórico)."""
+    updates = {}
+    for name in names:
+        status, curkey, bk = _order_book(name)
+        print(f"\n• {name}")
+        if status != "ok":
+            print(f"    sem order book ({status})")
+            continue
+        sym = "$" if curkey == "usd" else "R$"
+        sp = _spread_pct(bk)
+        print(f"    moeda           : {curkey.upper()}")
+        print(f"    maior encomenda : {sym} {bk['buyMax']:.2f}  (líquido ~{sym} {bk['buyMax'] * 0.85:.2f})")
+        print(f"    encomendas      : {bk['buyOrders']}")
+        print(f"    menor venda     : {sym} {bk['sellMin']:.2f}  ({bk['sellOrders']} ofertas)")
+        print(f"    spread          : {sp if sp is not None else '—'}%")
+        print(f"    valor do book   : {sym} {bk['buyNotional']:.2f}")
+        updates.setdefault(name, {})[curkey] = bk
+    if updates:
+        merge_orderbook(updates)
+
+
 def write_static(rows, brl_rate, public=False):
     rows.sort(key=lambda r: r["gold"] / r["usd"] if r["usd"] else 0, reverse=True)
     out = os.path.join(HERE, "index.html")
@@ -2243,9 +2515,13 @@ def main():
                     help="estima a taxa USD->BRL a partir de N itens reais (mais líquidos)")
     ap.add_argument("--currency", choices=list(CURRENCIES), default="brl",
                     help="moeda das consultas precisas (price/enrich)")
+    ap.add_argument("--orderbook-top", type=int, default=0, metavar="N",
+                    help="coleta as encomendas (buy orders) dos N itens mais líquidos")
     sub = ap.add_subparsers(dest="cmd")
     p = sub.add_parser("price", help="consulta PRECISA de 1+ itens (sob demanda)")
     p.add_argument("names", nargs="+")
+    b = sub.add_parser("book", help="consulta as encomendas (buy orders) de 1+ itens")
+    b.add_argument("names", nargs="+")
     s = sub.add_parser("serve", help="servidor local interativo")
     s.add_argument("--port", type=int, default=8765)
     args = ap.parse_args()
@@ -2255,6 +2531,9 @@ def main():
 
     if args.cmd == "price":
         cmd_price(args.names, args.currency)
+        return
+    if args.cmd == "book":
+        cmd_book(args.names)
         return
     if args.cmd == "serve":
         run_server(args.brl_rate, args.port)
@@ -2278,6 +2557,8 @@ def main():
             print("[calibrate] sem amostra; mantendo taxa padrão")
     if args.enrich_top:
         enrich(rows, args.enrich_top, args.currency)
+    if args.orderbook_top:
+        enrich_orderbook(rows, args.orderbook_top)
     write_static(rows, brl_rate, args.public)
     print("\nTop 10 por gold/$ (bulk):")
     for r in rows[:10]:

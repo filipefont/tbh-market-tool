@@ -4,3 +4,6 @@ _site/
 
 # specs/levantamentos locais — não versionar
 .spec/
+
+# cache de runtime das encomendas (gerado pelo build/CI)
+data/orderbook.json

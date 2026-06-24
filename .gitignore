@@ -11,3 +11,6 @@ data/orderbook.json
 data/first_seen.json
 # tabelas de drop completas (~1MB, p/ probabilidade exata — uso futuro): não versionar
 data/drops.json
+# assets gerados pelo build (CI regenera e publica) — não versionar código gerado
+assets/app.js
+assets/styles.css

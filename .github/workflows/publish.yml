@@ -40,6 +40,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Node só p/ validar a sintaxe do app.js gerado (rede de segurança contra erro de JS no deploy).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       # carrega os dados acumulados (cache do bulk + history.db) da execução anterior.
       # chave rolante por run_id; restore-keys casa o cache mais recente com prefixo "data-".
       - name: Restaura dados (cache)
@@ -74,6 +79,10 @@ jobs:
       - name: Gera o site (público)
         run: python3 build.py --public
 
+      # valida a sintaxe do JS gerado — pega erro de runtime/sintaxe antes de publicar
+      - name: Valida JS (node --check)
+        run: node --check assets/app.js
+
       # rede de segurança: falha o deploy se o build regredir
       - name: Smoke test
         run: python3 tests/smoke.py
@@ -83,6 +92,8 @@ jobs:
           mkdir -p _site/assets
           cp index.html _site/index.html
           cp assets/favicon.svg _site/assets/favicon.svg
+          cp assets/styles.css _site/assets/styles.css
+          cp assets/app.js _site/assets/app.js
 
       # rasteriza o card OG (SVG -> PNG) para preview ao compartilhar o link
       - name: Gera imagem OG (best-effort)

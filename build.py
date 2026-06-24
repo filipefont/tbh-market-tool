@@ -685,6 +685,48 @@ def build_rows(items, steam, enriched=None, book=None):
     return rows, unmatched
 
 
+# Piso de casamento item↔mercado. Hoje ~100%; uma queda indica nomes novos/renomeados (ex.: v1.00.20
+# da reabertura) que o nosso base da wiki ainda não cobre. Não derruba o build — só ALERTA.
+JOIN_MATCH_MIN = 0.98
+
+
+def report_join_health(rows, unmatched, steam, public=False):
+    """Imprime a saúde da junção e métricas-chave; ALERTA se o casamento cair. No CI (GitHub
+    Actions), também escreve um resumo no job-summary. Best-effort: nunca quebra o build."""
+    market = len({s["name"] for s in steam})
+    matched = max(market - len(unmatched), 0)
+    rate = matched / market if market else 1.0
+    locked = sum(1 for r in rows if r.get("gradeLock"))
+    with_book = sum(1 for r in rows if r.get("book"))
+    with_real = sum(1 for r in rows if r.get("real"))
+    print(f"\n[join] {len(rows)} linhas | casados {matched}/{market} ({rate:.1%}) | "
+          f"{len(unmatched)} sem correspondência | {locked} intradáveis (grade-lock) | "
+          f"{with_book} c/ encomenda | {with_real} c/ preço real")
+    low = rate < JOIN_MATCH_MIN
+    if low:
+        print(f"::warning::[join] casamento {rate:.1%} < {JOIN_MATCH_MIN:.0%} — itens novos/renomeados? "
+              f"rode --refresh e cheque a base da wiki")
+    if unmatched:
+        amostra = ", ".join(sorted(unmatched)[:15])
+        print(f"[join] sem match (amostra): {amostra}{' …' if len(unmatched) > 15 else ''}")
+    # resumo no job-summary do GitHub Actions (só no build público, o canônico do deploy)
+    summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary and public:
+        try:
+            with open(summary, "a", encoding="utf-8") as f:
+                f.write(
+                    f"### Build do site público\n"
+                    f"- **Linhas:** {len(rows)} · **encomendas:** {with_book} · **preço real:** {with_real}\n"
+                    f"- **Casamento item↔mercado:** {matched}/{market} (**{rate:.1%}**)"
+                    f"{' ⚠️ **abaixo do piso**' if low else ' ✅'}\n"
+                    f"- **Intradáveis (grade-lock):** {locked}\n")
+                if unmatched:
+                    f.write(f"- **Sem match ({len(unmatched)}):** {', '.join(sorted(unmatched)[:20])}"
+                            f"{' …' if len(unmatched) > 20 else ''}\n")
+        except OSError:
+            pass
+
+
 def attach_trends(rows, windows=(("chg24", 86400), ("chg7", 7 * 86400))):
     """Anexa variação % de preço (série USD do history.db) em cada linha. Silencioso se faltar BD."""
     if not os.path.exists(HISTORY_DB):
@@ -2598,7 +2640,6 @@ def main():
     rows.sort(key=lambda r: r["gold"] / r["usd"] if r["usd"] else 0, reverse=True)
     if args.refresh:
         record_bulk_history(rows)  # só registra quando o bulk é REbaixado (dado fresco)
-    print(f"\n[join] {len(rows)} itens cruzados | {len(unmatched)} sem correspondência")
     brl_rate = args.brl_rate
     if args.calibrate:
         print(f"[calibrate] amostrando {args.calibrate} itens mais líquidos...")
@@ -2612,6 +2653,7 @@ def main():
         enrich(rows, args.enrich_top, args.currency)
     if args.orderbook_top is not None:
         enrich_orderbook(rows, args.orderbook_top)
+    report_join_health(rows, unmatched, steam, args.public)  # saúde da junção + alerta (CI summary)
     write_static(rows, brl_rate, args.public)
     print("\nTop 10 por gold/$ (bulk):")
     for r in rows[:10]:

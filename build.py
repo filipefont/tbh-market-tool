@@ -67,6 +67,16 @@ HEADERS = {"User-Agent": "TBH-Market-Tool/1.0 (uso pessoal)"}
 # Ver .spec/roadmap-d25-reabertura.md.
 GRADE_LOCKED = {"COSMIC", "DIVINE", "CELESTIAL"}
 
+# Reabertura do mercado: 25/06/2026 04:00 BRT = 07:00 UTC. Âncora p/ "Δ desde a reabertura"
+# (variação acumulada de cada item desde que o mercado voltou). calendar.timegm((2026,6,25,7,0,0)).
+MARKET_REOPEN_TS = 1782370800
+# Selo "NOVO": itens vistos no mercado pela 1ª vez A PARTIR da reabertura (firstSeen >= âncora).
+# Persistido em data/first_seen.json (sobrevive via actions/cache). Expira após NEW_MAX_AGE p/ não
+# ficar "novo" para sempre. Itens já existentes ganham firstSeen na 1ª coleta (pré-reabertura) — logo
+# NÃO são marcados; só os que surgirem em/após 25/06.
+FIRST_SEEN_CACHE = os.path.join(DATA, "first_seen.json")
+NEW_MAX_AGE = 14 * 86400  # 14 dias
+
 
 def is_grade_locked(name, grade):
     """True se o item está sob a trava de grade da reabertura (grade top-3 e não-Soulstone)."""
@@ -690,6 +700,34 @@ def build_rows(items, steam, enriched=None, book=None):
 JOIN_MATCH_MIN = 0.98
 
 
+def mark_new_items(rows):
+    """Registra o 1º avistamento de cada item NO MERCADO (data/first_seen.json) e marca como NOVO
+    os que surgiram a partir da reabertura. Best-effort: nunca quebra o build."""
+    try:
+        seen = json.load(open(FIRST_SEEN_CACHE, encoding="utf-8")) if os.path.exists(FIRST_SEEN_CACHE) else {}
+    except (ValueError, OSError):
+        seen = {}
+    now = int(time.time())
+    changed = False
+    for r in rows:
+        if r.get("noBulk"):          # só conta quem está REALMENTE listado no mercado
+            continue
+        ts = seen.get(r["name"])
+        if ts is None:
+            seen[r["name"]] = ts = now
+            changed = True
+        if ts >= MARKET_REOPEN_TS and (now - ts) < NEW_MAX_AGE:
+            r["isNew"] = True
+    if changed:
+        try:
+            tmp = FIRST_SEEN_CACHE + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(seen, f, ensure_ascii=False)
+            os.replace(tmp, FIRST_SEEN_CACHE)
+        except OSError:
+            pass
+
+
 def report_join_health(rows, unmatched, steam, public=False):
     """Imprime a saúde da junção e métricas-chave; ALERTA se o casamento cair. No CI (GitHub
     Actions), também escreve um resumo no job-summary. Best-effort: nunca quebra o build."""
@@ -728,7 +766,9 @@ def report_join_health(rows, unmatched, steam, public=False):
 
 
 def attach_trends(rows, windows=(("chg24", 86400), ("chg7", 7 * 86400))):
-    """Anexa variação % de preço (série USD do history.db) em cada linha. Silencioso se faltar BD."""
+    """Anexa variação % de preço (série USD do history.db) em cada linha. Silencioso se faltar BD.
+    Inclui `chgReopen`: variação desde a reabertura do mercado (âncora absoluta) — fica vazio
+    enquanto não houver ponto a partir de MARKET_REOPEN_TS (antes de 25/06 e nos itens sem dado)."""
     if not os.path.exists(HISTORY_DB):
         return
     now = int(time.time())
@@ -757,6 +797,16 @@ def attach_trends(rows, windows=(("chg24", 86400), ("chg7", 7 * 86400))):
             return None             # sem ponto antigo o bastante p/ a janela: não inventa
         return round((new - old) / old * 100, 1)
 
+    def pct_since(pts, anchor):
+        """Variação do 1º ponto EM/APÓS `anchor` (base da reabertura) até o mais recente."""
+        if len(pts) < 2:
+            return None
+        new = pts[-1][1]
+        base = next((v for ts, v in pts if ts >= anchor), None)
+        if not base or base <= 0 or new is None or pts[-1][0] <= anchor:
+            return None             # sem ponto pós-reabertura (ou só a própria base): não inventa
+        return round((new - base) / base * 100, 1)
+
     for r in rows:
         pts = series.get(r["name"])
         if not pts:
@@ -765,6 +815,9 @@ def attach_trends(rows, windows=(("chg24", 86400), ("chg7", 7 * 86400))):
             c = pct(pts, secs)
             if c is not None:
                 r[key] = c
+        cr = pct_since(pts, MARKET_REOPEN_TS)
+        if cr is not None:
+            r["chgReopen"] = cr
 
 
 # --- HTML (placeholders __TOKEN__ etc.; sem .format p/ o JS ficar legível) ----------------
@@ -865,6 +918,15 @@ HTML_TEMPLATE = r"""<!doctype html>
   .lvl { color:#c2c9da; }
   .trend { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; cursor:help; }
   .trend.up { color:#5fd38d; } .trend.down { color:#e07a7a; } .trend.flat { color:#9aa3b8; }
+  /* faixa de "top movers" (maiores variações) — chips clicáveis */
+  #movers { padding:0 20px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  #movers:empty { display:none; }
+  .mvlbl { font-size:11px; color:#8b93a7; }
+  .mvchip { font-size:11px; max-width:200px; display:inline-flex; align-items:center; gap:4px;
+            border:1px solid #ffffff14; background:#ffffff0a; border-radius:999px; padding:2px 9px; cursor:pointer; }
+  .mvchip:hover { background:#ffffff14; }
+  .mvchip .mvn { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:120px; }
+  .mvchip.up { color:#5fd38d; } .mvchip.down { color:#e07a7a; }
   /* colunas de preço "real" levemente destacadas vs estimado */
   td.real, th.real { background:#1a1f1a40; }
   .g { color:#f4c430; } .money { color:#5fd38d; } .ppr { color:#7ab8ff; font-weight:600; }
@@ -877,6 +939,9 @@ HTML_TEMPLATE = r"""<!doctype html>
   /* selo de item intradável pela trava de grade da reabertura */
   .lock { font-size:10px; font-weight:600; color:#b9a0e0; border:1px solid #b9a0e055;
           background:#b9a0e01a; border-radius:6px; padding:1px 6px; cursor:help; white-space:nowrap; }
+  /* selo "NOVO": item listado a partir da reabertura */
+  .newb { font-size:9px; font-weight:700; letter-spacing:.04em; color:#1c1f26; background:#5fd38d;
+          border-radius:5px; padding:0 5px; cursor:help; vertical-align:1px; }
   /* indicador de frescor do preço real — sempre visível, cor por faixa */
   .age { display:inline-block; margin-left:6px; font-size:10px; font-weight:600;
          padding:1px 6px; border-radius:9px; cursor:help; vertical-align:middle;
@@ -925,6 +990,13 @@ HTML_TEMPLATE = r"""<!doctype html>
   .uniq { color:#e4ae39; cursor:help; }
   #status { font-size:12px; }
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+  /* selo "AO VIVO": reforça que o dado é atualizado automaticamente (≠ snapshot congelado) */
+  .live { display:inline-block; font-size:10px; font-weight:700; letter-spacing:.04em; color:#1c1f26;
+          background:#5fd38d; border-radius:6px; padding:1px 6px; margin-right:6px; vertical-align:1px; }
+  .live::before { content:"● "; animation:livepulse 1.6s ease-in-out infinite; }
+  .live.stale { background:#e0a35f; }
+  @keyframes livepulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  @media (prefers-reduced-motion: reduce){ .live::before{ animation:none } }
   .ok { background:#4caf50; } .off { background:#777; }
   /* toasts (substituem alert()) */
   #toasts { position:fixed; right:16px; bottom:16px; z-index:50; display:flex;
@@ -936,6 +1008,8 @@ HTML_TEMPLATE = r"""<!doctype html>
   .toast button { background:none; border:0; color:#9aa3b8; float:right; padding:0 0 0 8px; font-size:14px; }
   @keyframes tin { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
   footer { padding:10px 20px; font-size:11px; color:#8b93a7; }
+  .support { display:inline-block; margin-top:6px; color:#c2a24b; cursor:help; }
+  a.support { text-decoration:none; } a.support:hover { text-decoration:underline; }
   /* mobile: esconde colunas secundárias — Preço est.(5), Vol 24h(9), Listagens(10) */
   @media (max-width:720px) {
     .controls { padding:10px 12px; }
@@ -1013,6 +1087,10 @@ HTML_TEMPLATE = r"""<!doctype html>
     <span class="chip" id="resultcount" data-tip="itens visíveis / total"></span>
     <button id="favFilter" class="toggle" aria-pressed="false"
         data-tip="mostrar só os itens favoritados (⭐)">⭐ favoritos</button>
+    <button id="sellNow" class="toggle" aria-pressed="false"
+        data-tip="o que você RECEBE agora vendendo na encomenda (líquido −taxa Steam): ordena por isso e mostra só itens com encomenda ativa">💰 Vender agora</button>
+    <button id="soulFilter" class="toggle" aria-pressed="false"
+        data-tip="Soulstones — únicos itens de grade alta tradáveis no reabrir do mercado">🔮 Soulstones</button>
     <button id="clear" data-tip="limpa busca e todos os filtros">✕ Limpar</button>
   </div>
   <div class="group">
@@ -1028,6 +1106,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   __SERVER_CONTROLS__
 </div>
 <div id="activeFilters" aria-label="filtros ativos"></div>
+<div id="movers" aria-label="maiores variações de preço"></div>
 <div class="wrap">
 <table id="t"><thead><tr>
   <th data-k="name" tabindex="0">Item</th>
@@ -1054,7 +1133,9 @@ HTML_TEMPLATE = r"""<!doctype html>
 <div id="tip" role="tooltip"></div>
 <footer>Fonte itens: taskbarherowiki.com · preços: steamcommunity.com/market (appid 3678970).
   "est." = menor venda do bulk (USD) convertida pela taxa · "real" = priceoverview (mediana) na moeda ·
-  "Maior enc." = maior encomenda (buy order) ativa, "Encomendas" = demanda agregada — ordene por elas p/ achar o melhor item p/ vender por $.</footer>
+  "Maior enc." = maior encomenda (buy order) ativa, "Encomendas" = demanda agregada — ordene por elas p/ achar o melhor item p/ vender por $.
+  <!-- DOACAO: quando houver link (Ko-fi/PIX), trocar o <span> por <a href="LINK" target="_blank" rel="noopener noreferrer" class="support">…</a> -->
+  <br><span class="support" data-tip="link de apoio em breve — obrigado pelo interesse!">💛 Apoie o projeto · doações <strong>em breve</strong></span></footer>
 <script>
 let DATA = __DATA__;
 const TOKEN = "__TOKEN__";
@@ -1466,8 +1547,28 @@ function currentRows(){
   return rows;
 }
 
+// Top movers: maiores altas/quedas de preço. Usa "desde a reabertura" (chgReopen) quando há dado;
+// senão cai p/ 24h. Independe dos filtros (lê o DATA inteiro). Chips abrem o item.
+function renderMovers(){
+  const box=$("movers"); if(!box) return;
+  const useReopen = DATA.some(d=>d.chgReopen!=null);
+  const key = useReopen ? "chgReopen" : "chg24";
+  const lbl = useReopen ? "desde a reabertura" : "24h";
+  const withc = DATA.filter(d=>d[key]!=null);
+  if(withc.length<3){ box.innerHTML=""; return; }
+  const up=[...withc].filter(d=>d[key]>0).sort((a,b)=>b[key]-a[key]).slice(0,5);
+  const down=[...withc].filter(d=>d[key]<0).sort((a,b)=>a[key]-b[key]).slice(0,5);
+  if(!up.length && !down.length){ box.innerHTML=""; return; }
+  const chip=(d,cls)=>`<button class="mvchip ${cls}" data-name="${esc(d.name)}" title="abrir ${esc(d.name)} (${d[key]>0?"+":""}${d[key]}%)">`
+    + `${cls==="up"?"▲":"▼"} <span class="mvn">${esc(d.name)}</span> <b>${d[key]>0?"+":""}${d[key]}%</b></button>`;
+  box.innerHTML = `<span class="mvlbl">🔥 Maiores variações (${lbl}):</span> `
+    + up.map(d=>chip(d,"up")).join("") + down.map(d=>chip(d,"down")).join("");
+  box.querySelectorAll(".mvchip").forEach(b=> b.onclick=()=>{ const d=DATA.find(x=>x.name===b.dataset.name); if(d) openDetail(d); });
+}
+
 function render(){
   const rows = currentRows();
+  renderMovers();
 
   // baseline na moeda corrente
   const ppr = rows.map(d=>d.goldPerEst).filter(v=>v>0).sort((a,b)=>a-b);
@@ -1510,7 +1611,8 @@ function render(){
       ? `<img class="icon" src="${ICON_BASE}${encodeURIComponent(d.icon)}.png" alt="" loading="lazy" decoding="async"${gc?` style="border-color:${gc}66"`:""} onerror="this.onerror=null;this.classList.add('noimg');this.removeAttribute('src')">`
       : `<span class="icon noimg"></span>`;
     const uniq = d.uniqueMod ? `<span class="uniq" data-tip="modificador único: ${esc(attrLabel(d.uniqueMod))}">✦</span> ` : "";
-    const nameHtml = `<span class="itemname"${gc?` style="color:${gc}"`:""} data-tip="clique para ver detalhes">${uniq}${highlightName(d.name)}</span>`;
+    const newBadge = d.isNew ? `<span class="newb" data-tip="listado no mercado a partir da reabertura">NOVO</span> ` : "";
+    const nameHtml = `<span class="itemname"${gc?` style="color:${gc}"`:""} data-tip="clique para ver detalhes">${newBadge}${uniq}${highlightName(d.name)}</span>`;
     const steamBtn = `<a class="steam" href="${steamUrl(d.name)}" target="_blank" rel="noopener noreferrer" title="abrir listagem na Steam" aria-label="abrir na Steam">↗ Steam</a>`;
     const hasReal = d.priceReal!=null;
     const conv = hasReal && d.realConverted;   // preço veio convertido da outra moeda
@@ -1587,6 +1689,12 @@ function markSort(){
       s.textContent=sortDir<0?" ▼":" ▲"; th.appendChild(s);
     } else { th.removeAttribute("aria-sort"); }
   });
+  const sn = sortK==="buyNet" && $("avail").value==="buy";
+  $("sellNow").classList.toggle("on", sn);
+  $("sellNow").setAttribute("aria-pressed", String(sn));
+  const sl = $("q").value.trim().toLowerCase()==="soulstone";
+  $("soulFilter").classList.toggle("on", sl);
+  $("soulFilter").setAttribute("aria-pressed", String(sl));
 }
 
 function clearFilters(){
@@ -1637,6 +1745,17 @@ $("favFilter").onclick = ()=>{
   $("favFilter").setAttribute("aria-pressed", String(showFavs));
   rerender();
 };
+// preset "Vender agora": liquidação imediata. Alterna entre o preset (ordena por líquido da
+// encomenda + só com encomenda) e o estado padrão (gold/moeda, todos).
+function sellNowActive(){ return sortK==="buyNet" && $("avail").value==="buy"; }
+$("sellNow").onclick = ()=>{
+  if(sellNowActive()){ sortK="goldPerEst"; sortDir=-1; $("avail").value=""; }
+  else { sortK="buyNet"; sortDir=-1; $("avail").value="buy"; }
+  rerender();
+};
+// atalho Soulstones: alterna a busca por "Soulstone" (no reabrir, os únicos tradáveis de grade alta).
+function soulActive(){ return $("q").value.trim().toLowerCase()==="soulstone"; }
+$("soulFilter").onclick = ()=>{ $("q").value = soulActive() ? "" : "Soulstone"; rerender(); };
 
 // ---- navegação por teclado pelas linhas (↑/↓) + abrir na Steam (Enter) ----
 function visibleRows(){
@@ -1689,7 +1808,8 @@ function trendCell(d){
   const c=d.chg24;
   if(c==null) return '<span class="muted">—</span>';
   const cls=c>0?"up":(c<0?"down":"flat"), arr=c>0?"▲":(c<0?"▼":"■");
-  const tip=`24h: ${c>0?"+":""}${c}%`+(d.chg7!=null?` · 7d: ${d.chg7>0?"+":""}${d.chg7}%`:"");
+  const tip=`24h: ${c>0?"+":""}${c}%`+(d.chg7!=null?` · 7d: ${d.chg7>0?"+":""}${d.chg7}%`:"")
+            +(d.chgReopen!=null?` · desde a reabertura: ${d.chgReopen>0?"+":""}${d.chgReopen}%`:"");
   return `<span class="trend ${cls}" data-tip="${tip}">${arr} ${Math.abs(c)}%</span>`;
 }
 // realça o trecho buscado no nome (sobre o texto já escapado)
@@ -1727,7 +1847,7 @@ function renderChips(){
     ()=>{ ranges.minlist=0; const e=$("r_minlist"); if(e)e.value=""; updateRangeBtn(); });
   if(showFavs) add("⭐ Favoritos",
     ()=>{ showFavs=false; $("favFilter").classList.remove("on"); $("favFilter").setAttribute("aria-pressed","false"); });
-  if($("avail").value){ const m={vol:"só com giro 24h",offer:"esconder sem oferta"};
+  if($("avail").value){ const m={vol:"só com giro 24h",offer:"esconder sem oferta",buy:"só com encomenda"};
     add(m[$("avail").value]||$("avail").value, ()=>{ $("avail").value=""; }); }
   if(box.children.length>1){ const b=document.createElement("button"); b.id="fclearall";
     b.textContent="✕ limpar tudo"; b.onclick=clearFilters; box.appendChild(b); }
@@ -1781,6 +1901,7 @@ function openDetail(raw){
     [`Gold / ${sym().trim()} (est.)`, d.goldPerEst!=null ? fmt(d.goldPerEst) : "—"]];
   if(d.chg24!=null) econ.push(["Δ 24h", `${d.chg24>0?"+":""}${d.chg24}%`]);
   if(d.chg7!=null)  econ.push(["Δ 7d",  `${d.chg7>0?"+":""}${d.chg7}%`]);
+  if(d.chgReopen!=null) econ.push(["Δ desde a reabertura", `${d.chgReopen>0?"+":""}${d.chgReopen}%`]);
   if(d.priceReal!=null){ econ.push(["Preço real", sym()+d.priceReal.toFixed(2)]);
     if(d.goldPerReal!=null) econ.push([`Gold / ${sym().trim()} (real)`, fmt(d.goldPerReal)]); }
   if(d.vol!=null) econ.push(["Vol 24h", fmt(d.vol)]);
@@ -1810,6 +1931,7 @@ function openDetail(raw){
       <div class="dactions">
         <a class="steam" href="${steamUrl(d.name)}" target="_blank" rel="noopener noreferrer">↗ Steam</a>
         <button id="dCopy">⧉ copiar nome</button>
+        <button id="dLink" data-tip="copia um link que reabre o site já neste item">🔗 copiar link</button>
         <button id="dFav">${isFav?'★ favoritado':'☆ favoritar'}</button>
       </div>
     </div>`;
@@ -1818,6 +1940,9 @@ function openDetail(raw){
   $("detail").querySelector(".dclose").onclick=closeDetail;
   $("dCopy").onclick=()=>{ (navigator.clipboard?navigator.clipboard.writeText(d.name):Promise.reject())
     .then(()=>toast("Nome copiado.","ok"), ()=>toast("Não foi possível copiar.","error")); };
+  $("dLink").onclick=()=>{ const url=location.origin+location.pathname+"?q="+encodeURIComponent(d.name);
+    (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject())
+    .then(()=>toast("Link copiado.","ok"), ()=>toast("Não foi possível copiar.","error")); };
   $("dFav").onclick=()=>{ toggleFav(d.name); openDetail(raw); };
   if(serverOn) loadHistory(d.name);
 }
@@ -2081,7 +2206,13 @@ function showLastUpdate(){
   const a = ago(GEN_EPOCH);
   const when = new Date(GEN_EPOCH*1000).toLocaleString("pt-BR");
   const rel = a ? (a==="agora" ? "agora mesmo" : "há "+a) : "";
-  $("status").innerHTML = `<span class="dot ok"></span>somente leitura · preços atualizados ${rel} <span class="muted">(${when})</span>`;
+  // selo "AO VIVO": dados atualizados automaticamente (≠ print congelado). Some se o build ficar
+  // velho (Action travada) p/ não enganar — vira aviso de desatualizado.
+  const ageH = (Date.now()/1000 - GEN_EPOCH)/3600;
+  const live = ageH < 6
+    ? `<span class="live" title="dados ao vivo — atualizados automaticamente; não é um print congelado">AO VIVO</span> `
+    : `<span class="live stale" title="atualização automática atrasada — pode estar desatualizado">desatualizado</span> `;
+  $("status").innerHTML = `${live}<span class="dot ok"></span>somente leitura · preços atualizados ${rel} <span class="muted">(${when})</span>`;
 }
 (async function detectServer(){
   if(PUBLIC){            // Pages: sem servidor, sem atualização pela web
@@ -2653,6 +2784,7 @@ def main():
         enrich(rows, args.enrich_top, args.currency)
     if args.orderbook_top is not None:
         enrich_orderbook(rows, args.orderbook_top)
+    mark_new_items(rows)             # selo "NOVO" p/ itens listados a partir da reabertura
     report_join_health(rows, unmatched, steam, args.public)  # saúde da junção + alerta (CI summary)
     write_static(rows, brl_rate, args.public)
     print("\nTop 10 por gold/$ (bulk):")

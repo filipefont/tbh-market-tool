@@ -944,6 +944,13 @@ HTML_TEMPLATE = r"""<!doctype html>
   .uniq { color:#e4ae39; cursor:help; }
   #status { font-size:12px; }
   .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+  /* selo "AO VIVO": reforça que o dado é atualizado automaticamente (≠ snapshot congelado) */
+  .live { display:inline-block; font-size:10px; font-weight:700; letter-spacing:.04em; color:#1c1f26;
+          background:#5fd38d; border-radius:6px; padding:1px 6px; margin-right:6px; vertical-align:1px; }
+  .live::before { content:"● "; animation:livepulse 1.6s ease-in-out infinite; }
+  .live.stale { background:#e0a35f; }
+  @keyframes livepulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  @media (prefers-reduced-motion: reduce){ .live::before{ animation:none } }
   .ok { background:#4caf50; } .off { background:#777; }
   /* toasts (substituem alert()) */
   #toasts { position:fixed; right:16px; bottom:16px; z-index:50; display:flex;
@@ -1034,6 +1041,8 @@ HTML_TEMPLATE = r"""<!doctype html>
     <span class="chip" id="resultcount" data-tip="itens visíveis / total"></span>
     <button id="favFilter" class="toggle" aria-pressed="false"
         data-tip="mostrar só os itens favoritados (⭐)">⭐ favoritos</button>
+    <button id="sellNow" class="toggle" aria-pressed="false"
+        data-tip="o que você RECEBE agora vendendo na encomenda (líquido −taxa Steam): ordena por isso e mostra só itens com encomenda ativa">💰 Vender agora</button>
     <button id="clear" data-tip="limpa busca e todos os filtros">✕ Limpar</button>
   </div>
   <div class="group">
@@ -1610,6 +1619,9 @@ function markSort(){
       s.textContent=sortDir<0?" ▼":" ▲"; th.appendChild(s);
     } else { th.removeAttribute("aria-sort"); }
   });
+  const sn = sortK==="buyNet" && $("avail").value==="buy";
+  $("sellNow").classList.toggle("on", sn);
+  $("sellNow").setAttribute("aria-pressed", String(sn));
 }
 
 function clearFilters(){
@@ -1658,6 +1670,14 @@ $("favFilter").onclick = ()=>{
   showFavs = !showFavs;
   $("favFilter").classList.toggle("on", showFavs);
   $("favFilter").setAttribute("aria-pressed", String(showFavs));
+  rerender();
+};
+// preset "Vender agora": liquidação imediata. Alterna entre o preset (ordena por líquido da
+// encomenda + só com encomenda) e o estado padrão (gold/moeda, todos).
+function sellNowActive(){ return sortK==="buyNet" && $("avail").value==="buy"; }
+$("sellNow").onclick = ()=>{
+  if(sellNowActive()){ sortK="goldPerEst"; sortDir=-1; $("avail").value=""; }
+  else { sortK="buyNet"; sortDir=-1; $("avail").value="buy"; }
   rerender();
 };
 
@@ -1751,7 +1771,7 @@ function renderChips(){
     ()=>{ ranges.minlist=0; const e=$("r_minlist"); if(e)e.value=""; updateRangeBtn(); });
   if(showFavs) add("⭐ Favoritos",
     ()=>{ showFavs=false; $("favFilter").classList.remove("on"); $("favFilter").setAttribute("aria-pressed","false"); });
-  if($("avail").value){ const m={vol:"só com giro 24h",offer:"esconder sem oferta"};
+  if($("avail").value){ const m={vol:"só com giro 24h",offer:"esconder sem oferta",buy:"só com encomenda"};
     add(m[$("avail").value]||$("avail").value, ()=>{ $("avail").value=""; }); }
   if(box.children.length>1){ const b=document.createElement("button"); b.id="fclearall";
     b.textContent="✕ limpar tudo"; b.onclick=clearFilters; box.appendChild(b); }
@@ -2106,7 +2126,13 @@ function showLastUpdate(){
   const a = ago(GEN_EPOCH);
   const when = new Date(GEN_EPOCH*1000).toLocaleString("pt-BR");
   const rel = a ? (a==="agora" ? "agora mesmo" : "há "+a) : "";
-  $("status").innerHTML = `<span class="dot ok"></span>somente leitura · preços atualizados ${rel} <span class="muted">(${when})</span>`;
+  // selo "AO VIVO": dados atualizados automaticamente (≠ print congelado). Some se o build ficar
+  // velho (Action travada) p/ não enganar — vira aviso de desatualizado.
+  const ageH = (Date.now()/1000 - GEN_EPOCH)/3600;
+  const live = ageH < 6
+    ? `<span class="live" title="dados ao vivo — atualizados automaticamente; não é um print congelado">AO VIVO</span> `
+    : `<span class="live stale" title="atualização automática atrasada — pode estar desatualizado">desatualizado</span> `;
+  $("status").innerHTML = `${live}<span class="dot ok"></span>somente leitura · preços atualizados ${rel} <span class="muted">(${when})</span>`;
 }
 (async function detectServer(){
   if(PUBLIC){            // Pages: sem servidor, sem atualização pela web

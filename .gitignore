@@ -9,3 +9,5 @@ _site/
 data/orderbook.json
 # 1º avistamento dos itens no mercado (selo "NOVO" pós-reabertura) — runtime
 data/first_seen.json
+# tabelas de drop completas (~1MB, p/ probabilidade exata — uso futuro): não versionar
+data/drops.json

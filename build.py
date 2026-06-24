@@ -38,6 +38,11 @@ DATA = os.path.join(HERE, "data")
 
 APPID = 3678970  # TBH: Task Bar Hero (Steam app)
 ITEMS_URL = "https://www.taskbarherowiki.com/data/items.json"
+# Dados estendidos do jogo (mesma wiki/keyspace dos itens): efeitos das gemas, stages (farm) e
+# tabelas de drop. Fundação p/ as abas de Efeitos/Farm/Craft — ver .spec/roadmap-viabilidade.md.
+EFFECTS_URL = "https://www.taskbarherowiki.com/data/effects.json"
+STAGES_URL = "https://www.taskbarherowiki.com/data/stages.json"
+DROPS_URL = "https://www.taskbarherowiki.com/data/drops.json"
 STEAM_URL = (
     "https://steamcommunity.com/market/search/render/"
     f"?appid={APPID}&norender=1&count=100&start={{start}}"
@@ -52,6 +57,9 @@ LISTING_URL = f"https://steamcommunity.com/market/listings/{APPID}/{{name}}"
 CURRENCIES = {"usd": 1, "brl": 7}  # códigos de moeda da Steam
 CUR_BY_CODE = {v: k for k, v in CURRENCIES.items()}  # 7 -> "brl", 1 -> "usd"
 ITEMS_CACHE = os.path.join(DATA, "items.json")
+EFFECTS_CACHE = os.path.join(DATA, "effects.json")
+STAGES_CACHE = os.path.join(DATA, "stages.json")
+DROPS_CACHE = os.path.join(DATA, "drops.json")
 STEAM_CACHE = os.path.join(DATA, "steam_market.json")
 ENRICHED_CACHE = os.path.join(DATA, "enriched.json")
 ORDERBOOK_CACHE = os.path.join(DATA, "orderbook.json")  # encomendas (buy orders) por item/moeda
@@ -360,6 +368,100 @@ def get_items(refresh):
     json.dump(data, open(ITEMS_CACHE, "w", encoding="utf-8"))
     print(f"[items] {len(data)} itens salvos")
     return data
+
+
+def _get_cached(url, cache, label, refresh):
+    """Baixa+cacheia um JSON da wiki (mesma disciplina do get_items). Best-effort: se falhar e
+    houver cache, usa o cache; se não houver, retorna lista vazia (a feature só não aparece)."""
+    if not refresh and os.path.exists(cache):
+        try:
+            return json.load(open(cache, encoding="utf-8"))
+        except (ValueError, OSError):
+            pass
+    try:
+        data = fetch_json(url)
+        json.dump(data, open(cache, "w", encoding="utf-8"), ensure_ascii=False)
+        print(f"[{label}] {len(data)} registros salvos")
+        return data
+    except (RuntimeError, OSError) as e:
+        print(f"[{label}] falha ({e}); usando cache se houver")
+        try:
+            return json.load(open(cache, encoding="utf-8")) if os.path.exists(cache) else []
+        except (ValueError, OSError):
+            return []
+
+
+def get_effects(refresh):
+    return _get_cached(EFFECTS_URL, EFFECTS_CACHE, "effects", refresh)
+
+
+def get_stages(refresh):
+    return _get_cached(STAGES_URL, STAGES_CACHE, "stages", refresh)
+
+
+def get_drops(refresh):
+    return _get_cached(DROPS_URL, DROPS_CACHE, "drops", refresh)
+
+
+# Piso de cobertura das junções de dados estendidos (hoje 100%). Queda = a wiki mudou keyspace
+# ou renomeou; não derruba o build, só ALERTA (igual à saúde da junção do mercado).
+EXTRAS_MATCH_MIN = 0.95
+
+
+def attach_game_extras(rows, items, refresh=False):
+    """Anexa efeitos das gemas (row['effects']) e locais de drop/farm (row['droppedIn']) às linhas,
+    cruzando por `key` do item. Best-effort: nunca quebra o build. Imprime cobertura e ALERTA se
+    o casamento cair (itens novos/renomeados da wiki)."""
+    effects = get_effects(refresh)
+    stages = get_stages(refresh)
+    # drops.json (~1MB, probabilidade exata do craft/drop) NÃO é buscado ainda — só quando a feature
+    # de % de drop existir. get_drops() já está pronto p/ isso. Hoje o farm usa a `rate` dos stages.
+    if not effects and not stages:
+        return
+    key2name = {it.get("key"): join_key(it) for it in items}
+
+    # efeitos por nome de mercado (enxuto: só o que a UI precisa)
+    eff_by_name, eff_total, eff_ok = {}, 0, 0
+    for e in effects:
+        eff_total += 1
+        name = key2name.get(e.get("key"))
+        if not name:
+            continue
+        eff_ok += 1
+        eff_by_name[name] = [
+            {"slot": g.get("slot"), "stat": g.get("stat"), "disp": g.get("disp"), "chance": g.get("chance")}
+            for g in (e.get("groups") or [])
+        ]
+
+    # locais de drop por nome de mercado (a partir dos stages)
+    farm_by_name = {}
+    drop_keys, drop_ok = set(), set()
+    for s in stages:
+        for d in (s.get("drops") or []):
+            ik = d.get("itemKey")
+            drop_keys.add(ik)
+            name = key2name.get(ik)
+            if not name:
+                continue
+            drop_ok.add(ik)
+            farm_by_name.setdefault(name, []).append({
+                "stage": s.get("label"), "level": s.get("level"),
+                "rate": d.get("rate"), "source": d.get("source")})
+
+    for r in rows:
+        if r["name"] in eff_by_name:
+            r["effects"] = eff_by_name[r["name"]]
+        if r["name"] in farm_by_name:
+            r["droppedIn"] = farm_by_name[r["name"]]
+
+    er = eff_ok / eff_total if eff_total else 1.0
+    dr = len(drop_ok) / len(drop_keys) if drop_keys else 1.0
+    print(f"[extras] efeitos {eff_ok}/{eff_total} ({er:.0%}) · "
+          f"itens com drop {len(drop_ok)}/{len(drop_keys)} ({dr:.0%}) · "
+          f"{sum(1 for r in rows if r.get('effects'))} gemas e "
+          f"{sum(1 for r in rows if r.get('droppedIn'))} farmáveis nas linhas")
+    if min(er, dr) < EXTRAS_MATCH_MIN:
+        print(f"::warning::[extras] cobertura abaixo de {EXTRAS_MATCH_MIN:.0%} — wiki mudou keyspace/nomes?")
 
 
 def get_steam(refresh, log=print):
@@ -1896,6 +1998,14 @@ function openDetail(raw){
   const attrHtml = attrKeys.length
     ? attrKeys.map(a=>`<div class="dattr"><span class="an">${esc(attrLabel(a))}</span><span class="av">${esc(d.attrs[a].disp)}</span></div>`).join("")
     : `<div class="meta">sem atributos</div>`;
+  // efeitos da gema (effects.json): por slot, stat e intensidade (chance se < 100%)
+  const effHtml = (d.effects&&d.effects.length)
+    ? d.effects.map(g=>`<div class="dattr"><span class="an">${esc(g.slot||"")} · ${esc(attrLabel(g.stat||""))}${g.chance!=null&&g.chance<1?` <span class="muted">(${Math.round(g.chance*100)}%)</span>`:""}</span><span class="av">${esc(g.disp||"")}</span></div>`).join("")
+    : "";
+  // locais de drop (stages.json): onde farmar este item, com a taxa relativa
+  const farmHtml = (d.droppedIn&&d.droppedIn.length)
+    ? d.droppedIn.map(f=>`<div class="dattr"><span class="an">${esc(f.stage||"?")}${f.level!=null?` <span class="muted">Lv ${f.level}</span>`:""}${f.source?` <span class="muted">· ${esc(f.source)}</span>`:""}</span><span class="av">taxa ${esc(String(f.rate??"—"))}</span></div>`).join("")
+    : "";
   const econ=[["Gold (Cubo)", fmt(d.gold)],
     ["Preço (est.)", d.priceEst!=null ? sym()+d.priceEst.toFixed(2) : "— (sem bulk)"],
     [`Gold / ${sym().trim()} (est.)`, d.goldPerEst!=null ? fmt(d.goldPerEst) : "—"]];
@@ -1926,6 +2036,8 @@ function openDetail(raw){
     <div class="dbody">
       <div class="dsec"><h3>Detalhes</h3><div class="dgrid">${kvHtml(meta)}</div></div>
       <div class="dsec"><h3>Atributos</h3>${attrHtml}</div>
+      ${effHtml?`<div class="dsec"><h3>Efeitos (gema)</h3>${effHtml}</div>`:""}
+      ${farmHtml?`<div class="dsec"><h3>Onde dropa (farm)</h3>${farmHtml}</div>`:""}
       <div class="dsec"><h3>Economia</h3><div class="dgrid">${kvHtml(econ)}</div></div>
       <div class="dsec" id="dHist"><h3>Histórico de preço</h3><div class="meta">${serverOn?'carregando…':'disponível no modo servidor'}</div></div>
       <div class="dactions">
@@ -2785,6 +2897,7 @@ def main():
     if args.orderbook_top is not None:
         enrich_orderbook(rows, args.orderbook_top)
     mark_new_items(rows)             # selo "NOVO" p/ itens listados a partir da reabertura
+    attach_game_extras(rows, items, args.refresh)  # efeitos das gemas + locais de drop (farm)
     report_join_health(rows, unmatched, steam, args.public)  # saúde da junção + alerta (CI summary)
     write_static(rows, brl_rate, args.public)
     print("\nTop 10 por gold/$ (bulk):")

@@ -100,7 +100,19 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      # usa a URL da tentativa que deu certo (1ª ou retry)
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
+      # 1ª tentativa: o deploy do Pages às vezes fica preso em "deployment_queued" e estoura o
+      # timeout (incidente transitório do GitHub). continue-on-error deixa o job seguir p/ o retry.
       - id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      # respiro p/ a fila do Pages limpar antes de tentar de novo
+      - if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+      # retry automático: uma nova tentativa costuma passar (foi o que o rerun manual confirmou).
+      # Sem continue-on-error: se o retry também falhar, o job falha e o GitHub notifica.
+      - id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4

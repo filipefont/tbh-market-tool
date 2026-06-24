@@ -81,6 +81,25 @@ if bn:
     check(bn["sellOrders"] == 0, f"parse_orderbook sellOrders errado: {bn.get('sellOrders')}")
     check(build._spread_pct(bn) is None, "spread sem venda deveria ser None")
 
+# 5) junção dos dados estendidos (effects/stages) — usa os caches versionados (offline).
+# Protege a fundação: se a wiki mudar o keyspace/nomes, a cobertura cai e o teste acusa.
+import os as _os  # noqa: E402
+import json  # noqa: E402
+if _os.path.exists(build.EFFECTS_CACHE) and _os.path.exists(build.ITEMS_CACHE):
+    _items = json.load(open(build.ITEMS_CACHE, encoding="utf-8"))
+    _eff = json.load(open(build.EFFECTS_CACHE, encoding="utf-8"))
+    _k2n = {it.get("key"): build.join_key(it) for it in _items}
+    _matched = sum(1 for e in _eff if e.get("key") in _k2n)
+    _rate = _matched / len(_eff) if _eff else 0
+    check(_rate >= build.EXTRAS_MATCH_MIN,
+          f"cobertura de efeitos {_rate:.0%} < {build.EXTRAS_MATCH_MIN:.0%} (wiki mudou keyspace?)")
+    # a junção realmente anexa effects/droppedIn às linhas?
+    _gem = next((build.join_key(it) for it in _items if it.get("key") in {e.get("key") for e in _eff}), None)
+    if _gem:
+        _rows = [{"name": _gem}]
+        build.attach_game_extras(_rows, _items, refresh=False)
+        check(_rows[0].get("effects"), f"attach_game_extras não anexou efeitos em '{_gem}'")
+
 if fails:
     print("SMOKE: FALHOU")
     for f in fails:

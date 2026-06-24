@@ -67,6 +67,10 @@ HEADERS = {"User-Agent": "TBH-Market-Tool/1.0 (uso pessoal)"}
 # Ver .spec/roadmap-d25-reabertura.md.
 GRADE_LOCKED = {"COSMIC", "DIVINE", "CELESTIAL"}
 
+# Reabertura do mercado: 25/06/2026 04:00 BRT = 07:00 UTC. Âncora p/ "Δ desde a reabertura"
+# (variação acumulada de cada item desde que o mercado voltou). calendar.timegm((2026,6,25,7,0,0)).
+MARKET_REOPEN_TS = 1782370800
+
 
 def is_grade_locked(name, grade):
     """True se o item está sob a trava de grade da reabertura (grade top-3 e não-Soulstone)."""
@@ -728,7 +732,9 @@ def report_join_health(rows, unmatched, steam, public=False):
 
 
 def attach_trends(rows, windows=(("chg24", 86400), ("chg7", 7 * 86400))):
-    """Anexa variação % de preço (série USD do history.db) em cada linha. Silencioso se faltar BD."""
+    """Anexa variação % de preço (série USD do history.db) em cada linha. Silencioso se faltar BD.
+    Inclui `chgReopen`: variação desde a reabertura do mercado (âncora absoluta) — fica vazio
+    enquanto não houver ponto a partir de MARKET_REOPEN_TS (antes de 25/06 e nos itens sem dado)."""
     if not os.path.exists(HISTORY_DB):
         return
     now = int(time.time())
@@ -757,6 +763,16 @@ def attach_trends(rows, windows=(("chg24", 86400), ("chg7", 7 * 86400))):
             return None             # sem ponto antigo o bastante p/ a janela: não inventa
         return round((new - old) / old * 100, 1)
 
+    def pct_since(pts, anchor):
+        """Variação do 1º ponto EM/APÓS `anchor` (base da reabertura) até o mais recente."""
+        if len(pts) < 2:
+            return None
+        new = pts[-1][1]
+        base = next((v for ts, v in pts if ts >= anchor), None)
+        if not base or base <= 0 or new is None or pts[-1][0] <= anchor:
+            return None             # sem ponto pós-reabertura (ou só a própria base): não inventa
+        return round((new - base) / base * 100, 1)
+
     for r in rows:
         pts = series.get(r["name"])
         if not pts:
@@ -765,6 +781,9 @@ def attach_trends(rows, windows=(("chg24", 86400), ("chg7", 7 * 86400))):
             c = pct(pts, secs)
             if c is not None:
                 r[key] = c
+        cr = pct_since(pts, MARKET_REOPEN_TS)
+        if cr is not None:
+            r["chgReopen"] = cr
 
 
 # --- HTML (placeholders __TOKEN__ etc.; sem .format p/ o JS ficar legível) ----------------
@@ -936,6 +955,8 @@ HTML_TEMPLATE = r"""<!doctype html>
   .toast button { background:none; border:0; color:#9aa3b8; float:right; padding:0 0 0 8px; font-size:14px; }
   @keyframes tin { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
   footer { padding:10px 20px; font-size:11px; color:#8b93a7; }
+  .support { display:inline-block; margin-top:6px; color:#c2a24b; cursor:help; }
+  a.support { text-decoration:none; } a.support:hover { text-decoration:underline; }
   /* mobile: esconde colunas secundárias — Preço est.(5), Vol 24h(9), Listagens(10) */
   @media (max-width:720px) {
     .controls { padding:10px 12px; }
@@ -1054,7 +1075,9 @@ HTML_TEMPLATE = r"""<!doctype html>
 <div id="tip" role="tooltip"></div>
 <footer>Fonte itens: taskbarherowiki.com · preços: steamcommunity.com/market (appid 3678970).
   "est." = menor venda do bulk (USD) convertida pela taxa · "real" = priceoverview (mediana) na moeda ·
-  "Maior enc." = maior encomenda (buy order) ativa, "Encomendas" = demanda agregada — ordene por elas p/ achar o melhor item p/ vender por $.</footer>
+  "Maior enc." = maior encomenda (buy order) ativa, "Encomendas" = demanda agregada — ordene por elas p/ achar o melhor item p/ vender por $.
+  <!-- DOACAO: quando houver link (Ko-fi/PIX), trocar o <span> por <a href="LINK" target="_blank" rel="noopener noreferrer" class="support">…</a> -->
+  <br><span class="support" data-tip="link de apoio em breve — obrigado pelo interesse!">💛 Apoie o projeto · doações <strong>em breve</strong></span></footer>
 <script>
 let DATA = __DATA__;
 const TOKEN = "__TOKEN__";
@@ -1689,7 +1712,8 @@ function trendCell(d){
   const c=d.chg24;
   if(c==null) return '<span class="muted">—</span>';
   const cls=c>0?"up":(c<0?"down":"flat"), arr=c>0?"▲":(c<0?"▼":"■");
-  const tip=`24h: ${c>0?"+":""}${c}%`+(d.chg7!=null?` · 7d: ${d.chg7>0?"+":""}${d.chg7}%`:"");
+  const tip=`24h: ${c>0?"+":""}${c}%`+(d.chg7!=null?` · 7d: ${d.chg7>0?"+":""}${d.chg7}%`:"")
+            +(d.chgReopen!=null?` · desde a reabertura: ${d.chgReopen>0?"+":""}${d.chgReopen}%`:"");
   return `<span class="trend ${cls}" data-tip="${tip}">${arr} ${Math.abs(c)}%</span>`;
 }
 // realça o trecho buscado no nome (sobre o texto já escapado)
@@ -1781,6 +1805,7 @@ function openDetail(raw){
     [`Gold / ${sym().trim()} (est.)`, d.goldPerEst!=null ? fmt(d.goldPerEst) : "—"]];
   if(d.chg24!=null) econ.push(["Δ 24h", `${d.chg24>0?"+":""}${d.chg24}%`]);
   if(d.chg7!=null)  econ.push(["Δ 7d",  `${d.chg7>0?"+":""}${d.chg7}%`]);
+  if(d.chgReopen!=null) econ.push(["Δ desde a reabertura", `${d.chgReopen>0?"+":""}${d.chgReopen}%`]);
   if(d.priceReal!=null){ econ.push(["Preço real", sym()+d.priceReal.toFixed(2)]);
     if(d.goldPerReal!=null) econ.push([`Gold / ${sym().trim()} (real)`, fmt(d.goldPerReal)]); }
   if(d.vol!=null) econ.push(["Vol 24h", fmt(d.vol)]);

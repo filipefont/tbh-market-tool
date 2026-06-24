@@ -60,6 +60,18 @@ BOOK_DEPTH = 12       # nº de níveis de preço guardados do book de compra (ma
 ORDERBOOK_TTL = 1800  # segundos: não re-busca o order book do mesmo item nesse intervalo
 HEADERS = {"User-Agent": "TBH-Market-Tool/1.0 (uso pessoal)"}
 
+# Trava de grade na reabertura do mercado (25/06/2026, v1.00.20): os 3 grades mais altos ficam
+# SEM listagem por tempo indeterminado — EXCETO Soulstones. Marcamos esses itens como "intradável
+# (trava de grade)" p/ não exibir "sem oferta"/⚠️ liquidez falsa. O dev libera depois, em anúncio à
+# parte: quando isso ocorrer, basta esvaziar GRADE_LOCKED (set vazio) — nada mais muda.
+# Ver .spec/roadmap-d25-reabertura.md.
+GRADE_LOCKED = {"COSMIC", "DIVINE", "CELESTIAL"}
+
+
+def is_grade_locked(name, grade):
+    """True se o item está sob a trava de grade da reabertura (grade top-3 e não-Soulstone)."""
+    return grade in GRADE_LOCKED and not (name or "").startswith("Soulstone")
+
 # --- Proteção da API da Steam: throttle global ADAPTATIVO + cooldown no 429 ----------------
 # A Steam limita o priceoverview a ~20-30 req/min por IP, mas escala p/ cooldown temporário
 # (tudo vira 429) se você fica colado no teto. O ritmo aqui é AIMD (additive-increase /
@@ -619,6 +631,8 @@ def _row_from_item(it, name, usd, listings, enriched, book=None):
         "variant": it.get("variant"),       # A / B
         "tradable": it.get("tradable"),     # vendável no mercado?
     }
+    if is_grade_locked(name, it.get("grade")):
+        row["gradeLock"] = True             # reabertura: grade top-3 sem listagem (≠ Soulstone)
     if not usd or usd <= 0:
         row["noBulk"] = True                # sem preço no snapshot do bulk
     if it.get("slots"):
@@ -818,6 +832,9 @@ HTML_TEMPLATE = r"""<!doctype html>
            border:1px solid transparent; }
   .low { color:#e07a7a; } .muted { color:#9aa3b8; }
   .warn { margin-left:5px; cursor:help; }
+  /* selo de item intradável pela trava de grade da reabertura */
+  .lock { font-size:10px; font-weight:600; color:#b9a0e0; border:1px solid #b9a0e055;
+          background:#b9a0e01a; border-radius:6px; padding:1px 6px; cursor:help; white-space:nowrap; }
   /* indicador de frescor do preço real — sempre visível, cor por faixa */
   .age { display:inline-block; margin-left:6px; font-size:10px; font-weight:600;
          padding:1px 6px; border-radius:9px; cursor:help; vertical-align:middle;
@@ -1463,8 +1480,12 @@ function render(){
     const ageTag = age
       ? `<span class="age ${ac}" title="preço real atualizado há ${age}${ac!=='fresh'?' — convém re-buscar':''}">${ac==='fresh'?'':'⏱ '}${age}</span>`
       : "";
-    const volWarn = (d.vol!=null&&d.vol<5) ? `<span class="warn" title="liquidez baixa: menos de 5 vendas/24h">⚠️</span>` : "";
-    const listWarn = (d.listings<10) ? `<span class="warn" title="poucas listagens: preço pode oscilar">⚠️</span>` : "";
+    // trava de grade na reabertura: grade top-3 sem listagem (≠ Soulstone). Não é "sem oferta":
+    // suprime os ⚠️ de liquidez (falsos aqui) e mostra um selo "intradável" no lugar do preço.
+    const gLock = d.gradeLock===true;
+    const lockTag = gLock ? `<span class="lock" title="grade restrito de listagem na reabertura do mercado — liberação em anúncio futuro do jogo (Soulstones são exceção)">intradável</span>` : "";
+    const volWarn = (!gLock && d.vol!=null&&d.vol<5) ? `<span class="warn" title="liquidez baixa: menos de 5 vendas/24h">⚠️</span>` : "";
+    const listWarn = (!gLock && d.listings<10) ? `<span class="warn" title="poucas listagens: preço pode oscilar">⚠️</span>` : "";
     // arbitragem: marca quando gold/moeda (est.) está bem acima da mediana do filtro
     const deal = (d.goldPerEst>0 && dealCut>0 && d.goldPerEst>=dealCut)
       ? `<span class="deal" title="ótimo negócio: gold/${sym().trim()} ≥ 2× a mediana do filtro">🔥</span>` : "";
@@ -1495,7 +1516,7 @@ function render(){
       <td class="lvl">${d.level!=null?d.level:"—"}</td>
       ${acols.map(a=>`<td class="attrcell">${d.attrs&&d.attrs[a]?esc(d.attrs[a].disp):"—"}</td>`).join("")}
       <td class="g abbr" data-tip="${fmt(d.gold)} gold">${fmtAbbr(d.gold)}</td>
-      <td class="money">${d.priceEst!=null?(sym()+d.priceEst.toFixed(2)):`<span class="muted" data-tip="sem preço no bulk${serverOn?' — clique ↻ p/ buscar':''}">—</span>`}</td>
+      <td class="money">${gLock?lockTag:(d.priceEst!=null?(sym()+d.priceEst.toFixed(2)):`<span class="muted" data-tip="sem preço no bulk${serverOn?' — clique ↻ p/ buscar':''}">—</span>`)}</td>
       <td>${trendCell(d)}</td>
       <td class="ppr bar" style="--p:${barP}%"><span class="v abbr" data-tip="${fmt(d.goldPerEst)}">${fmtAbbr(d.goldPerEst)}</span>${deal}</td>
       <td class="money real"${netTitle}>${hasReal?(convMark+sym()+d.priceReal.toFixed(2)):"—"}${check}${ageTag}${px}</td>
@@ -1707,7 +1728,7 @@ function openDetail(raw){
   if(d.level!=null) meta.push(["Nível", d.level]);
   if(d.variant) meta.push(["Variante", d.variant]);
   if(d.slots) meta.push(["Slots", `deco ${d.slots.decoration||0} · engrav ${d.slots.engraving||0} · inscr ${d.slots.inscription||0}`]);
-  meta.push(["Tradável", d.tradable?"sim":"não"]);
+  meta.push(["Tradável", d.gradeLock?"intradável (trava de grade na reabertura)":(d.tradable?"sim":"não")]);
   if(d.uniqueMod) meta.push(["Único", attrLabel(d.uniqueMod)]);
   const attrKeys = d.attrs ? Object.keys(d.attrs).sort() : [];
   const attrHtml = attrKeys.length

@@ -14,3 +14,5 @@ data/drops.json
 # assets gerados pelo build (CI regenera e publica) — não versionar código gerado
 assets/app.js
 assets/styles.css
+# feed público gerado pelo build (api/data.json) — CI regenera
+api/

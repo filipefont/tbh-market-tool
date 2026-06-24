@@ -10,6 +10,7 @@ Garante que:
 Uso: python3 tests/smoke.py   (rode da raiz do repo)
 Sai com código !=0 se algo regredir.
 """
+import json
 import os
 import sys
 
@@ -35,7 +36,16 @@ if os.path.exists(idx):
     check('id="refresh"' not in html, "index.html ainda expõe botão de atualização")
     check("preços atualizados" in html, "index.html sem rótulo de última atualização")
     check("og:image" in html and "__SITE__" not in html, "index.html sem meta og:image válida")
-    check("let DATA = []" not in html, "index.html sem itens (DATA vazio)")
+    # DATA agora vem do feed: o index público embute DATA=[] e busca api/data.json.
+    # Garante que o feed existe e tem itens (em vez de checar DATA inline).
+    feed = os.path.join(ROOT, "api", "data.json")
+    if "let DATA = []" in html:                       # build desacoplado (público)
+        check(os.path.exists(feed), "build público sem api/data.json (feed)")
+        if os.path.exists(feed):
+            rows = json.load(open(feed, encoding="utf-8"))
+            check(isinstance(rows, list) and len(rows) > 0, "api/data.json vazio")
+    check('src="assets/app.js"' in html or "function render(" in html,
+          "index.html não referencia o app.js externo")
 
 # 2) modo SERVIDOR mantém os controles
 srv = build.render_html([], 5.4, token="x", public=False)

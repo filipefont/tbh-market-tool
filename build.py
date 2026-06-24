@@ -2476,11 +2476,49 @@ SERVER_CONTROLS_HTML = """<div class="group">
   </div>"""
 
 
+# --- Desacoplamento de assets ------------------------------------------------------------
+# O front-end mora num único template, mas servimos CSS e JS como arquivos ESTÁTICOS próprios
+# (cacheáveis: só o index.html — shell pequeno + DATA — muda a cada build). O split é feito UMA vez,
+# em tempo de import: <style> -> styles.css, <script> -> app.js, deixando inline só as 4 linhas de
+# config (DATA/TOKEN/PUBLIC/GEN_EPOCH, que mudam por build). Scripts clássicos compartilham o escopo
+# léxico global, então o app.js enxerga as consts declaradas no script de config inline.
+_JS_SPLIT_MARK = "const $ = id => document.getElementById(id);"
+
+
+def _split_template(tmpl):
+    m_css = re.search(r"<style>(.*?)</style>", tmpl, re.S)
+    m_js = re.search(r"<script>(.*)</script>", tmpl, re.S)   # guloso -> último </script>
+    js = m_js.group(1)
+    i = js.index(_JS_SPLIT_MARK)
+    config_js, app_js = js[:i], js[i:]                       # config (placeholders) | código estável
+    shell = tmpl.replace(m_css.group(0), '<link rel="stylesheet" href="assets/styles.css">')
+    shell = shell.replace(
+        m_js.group(0), "<script>" + config_js + "</script>\n<script src=\"assets/app.js\" defer></script>")
+    css, app_js = m_css.group(1).strip("\n"), app_js
+    for ph in ("__DATA__", "__TOKEN__", "__PUBLIC__", "__GEN_EPOCH__", "__SITE__",
+               "__N__", "__RATE__", "__GENERATED__", "__SERVER_CONTROLS__"):
+        assert ph not in css and ph not in app_js, f"placeholder {ph} vazou p/ um asset estático"
+    return shell, css, app_js
+
+
+_SHELL, CSS_CONTENT, APP_JS = _split_template(HTML_TEMPLATE)
+
+
+def write_assets(adir=None):
+    """Grava os assets estáticos (CSS + app.js). Cacheáveis; mudam raramente (só com deploy de código)."""
+    adir = adir or os.path.join(HERE, "assets")
+    os.makedirs(adir, exist_ok=True)
+    with open(os.path.join(adir, "styles.css"), "w", encoding="utf-8") as f:
+        f.write(CSS_CONTENT)
+    with open(os.path.join(adir, "app.js"), "w", encoding="utf-8") as f:
+        f.write(APP_JS)
+
+
 def render_html(rows, brl_rate, token="", public=False):
     data = json.dumps(rows, ensure_ascii=False)
     # anti-XSS: impede quebra do </script> e injeção via conteúdo do JSON
     data = data.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
-    out = HTML_TEMPLATE
+    out = _SHELL
     for k, v in {
         # URL pública (og:image/og:url) — trocar aqui se migrar para domínio próprio
         "__SITE__": SITE_URL,
@@ -2648,9 +2686,10 @@ def cmd_book(names):
 
 def write_static(rows, brl_rate, public=False):
     rows.sort(key=lambda r: r["gold"] / r["usd"] if r["usd"] else 0, reverse=True)
+    write_assets()                       # assets/styles.css + assets/app.js (cacheáveis)
     out = os.path.join(HERE, "index.html")
     open(out, "w", encoding="utf-8").write(render_html(rows, brl_rate, public=public))
-    print(f"[ok] gerado: {out}" + (" (público/somente leitura)" if public else ""))
+    print(f"[ok] gerado: {out} + assets/{{styles.css,app.js}}" + (" (público)" if public else ""))
 
 
 # --- Servidor local seguro ---------------------------------------------------------------
@@ -2794,6 +2833,10 @@ def run_server(brl_rate, port):
             q = urllib.parse.parse_qs(u.query)
             if u.path in ("/", "/index.html"):
                 self._send(200, render_html(rows_cache["rows"], brl_rate, token), "text/html")
+            elif u.path == "/assets/app.js":           # asset estático (memória; sem auth)
+                self._send(200, APP_JS, "application/javascript")
+            elif u.path == "/assets/styles.css":
+                self._send(200, CSS_CONTENT, "text/css")
             elif u.path == "/api/ping":
                 if self._auth():
                     self._send(200, {"ok": True})

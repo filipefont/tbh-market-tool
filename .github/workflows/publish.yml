@@ -11,7 +11,11 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "0 */2 * * *"   # a cada 2h
+    # JANELA DE REABERTURA (25/06/2026): cadência de 1h p/ capturar a formação de preço/encomenda
+    # nas primeiras 24–48h. É a cadência máxima ÚTIL: o passo de encomendas varre ~600 itens (~50min),
+    # então intervalos menores só empilham execuções (concurrency serializa). REVERTER p/ "0 */2 * * *"
+    # quando a volatilidade baixar. Ver .spec/roadmap-d25-reabertura.md (item 3).
+    - cron: "0 * * * *"   # de hora em hora (TEMPORÁRIO — normal: 0 */2 * * *)
   workflow_dispatch:
 
 # Permissões mínimas: só o necessário para publicar no Pages (sem contents: write).

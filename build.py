@@ -2158,17 +2158,32 @@ def _spread_pct(bk):
     return round((sm - bm) / sm * 100) if sm and bm is not None else None
 
 
+ORDERBOOK_FLUSH_EVERY = 20  # salva o cache a cada N coletas (resiliência a timeout/crash do CI)
+
+
 def enrich_orderbook(rows, top_n):
-    """Coleta as encomendas (buy orders) dos N itens mais líquidos (onde há demanda real).
-    A seleção é por nº de listagens — proxy de mercado ativo; sem book não dá p/ rankear por
-    demanda ainda. Respeita o TTL p/ não remartelar e o throttle global da Steam."""
+    """Coleta as encomendas (buy orders) dos itens mais líquidos (onde há demanda real).
+    `top_n <= 0` coleta TODOS os candidatos. A seleção é por nº de listagens — proxy de mercado
+    ativo. Respeita o TTL p/ não remartelar e o throttle global da Steam.
+
+    Salva o cache incrementalmente (a cada ORDERBOOK_FLUSH_EVERY itens): uma coleta longa pode
+    estourar o timeout do passo do CI; sem flush, todo o progresso se perderia."""
     book = load_orderbook()
     candidates = sorted((r for r in rows if r.get("listings")),
                         key=lambda r: r["listings"], reverse=True)
-    updates, done = {}, 0
-    print(f"\n[orderbook] encomendas dos {top_n} itens mais líquidos...")
+    limit = len(candidates) if top_n <= 0 else top_n
+    pending, done = {}, 0  # `pending`: coletas ainda não persistidas (zera a cada flush)
+    alvo = "todos" if top_n <= 0 else str(limit)
+    print(f"\n[orderbook] encomendas dos {alvo} itens mais líquidos...")
+
+    def flush():
+        if pending:
+            save_orderbook(book)
+            record_order_history(pending)
+            pending.clear()
+
     for r in candidates:
-        if done >= top_n:
+        if done >= limit:
             break
         if is_book_fresh(r["name"], ORDERBOOK_TTL, book):
             continue
@@ -2177,15 +2192,16 @@ def enrich_orderbook(rows, top_n):
             print(f"  - {r['name']}: {status}")
             continue
         book.setdefault(r["name"], {})[curkey] = bk
-        updates.setdefault(r["name"], {})[curkey] = bk
+        pending.setdefault(r["name"], {})[curkey] = bk
         r["book"] = book[r["name"]]
         sp = _spread_pct(bk)
         bm = f"{bk['buyMax']:.2f}" if bk['buyMax'] is not None else "—"
         print(f"  + {r['name']}: maior enc {bm} {curkey.upper()} · "
               f"{bk['buyOrders']} enc · spread {sp if sp is not None else '—'}%")
         done += 1
-    save_orderbook(book)
-    record_order_history(updates)
+        if done % ORDERBOOK_FLUSH_EVERY == 0:
+            flush()
+    flush()
     print(f"[orderbook] {done} itens com encomenda coletados")
 
 
@@ -2531,8 +2547,8 @@ def main():
                     help="estima a taxa USD->BRL a partir de N itens reais (mais líquidos)")
     ap.add_argument("--currency", choices=list(CURRENCIES), default="brl",
                     help="moeda das consultas precisas (price/enrich)")
-    ap.add_argument("--orderbook-top", type=int, default=0, metavar="N",
-                    help="coleta as encomendas (buy orders) dos N itens mais líquidos")
+    ap.add_argument("--orderbook-top", type=int, default=None, metavar="N",
+                    help="coleta as encomendas (buy orders) dos N itens mais líquidos (0 = todos)")
     sub = ap.add_subparsers(dest="cmd")
     p = sub.add_parser("price", help="consulta PRECISA de 1+ itens (sob demanda)")
     p.add_argument("names", nargs="+")
@@ -2573,7 +2589,7 @@ def main():
             print("[calibrate] sem amostra; mantendo taxa padrão")
     if args.enrich_top:
         enrich(rows, args.enrich_top, args.currency)
-    if args.orderbook_top:
+    if args.orderbook_top is not None:
         enrich_orderbook(rows, args.orderbook_top)
     write_static(rows, brl_rate, args.public)
     print("\nTop 10 por gold/$ (bulk):")

@@ -89,11 +89,12 @@ jobs:
 
       - name: Prepara artefato do Pages
         run: |
-          mkdir -p _site/assets
+          mkdir -p _site/assets _site/api
           cp index.html _site/index.html
           cp assets/favicon.svg _site/assets/favicon.svg
           cp assets/styles.css _site/assets/styles.css
           cp assets/app.js _site/assets/app.js
+          cp api/data.json _site/api/data.json
 
       # rasteriza o card OG (SVG -> PNG) para preview ao compartilhar o link
       - name: Gera imagem OG (best-effort)

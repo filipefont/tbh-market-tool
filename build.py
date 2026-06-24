@@ -2435,7 +2435,12 @@ function showLastUpdate(){
 (async function detectServer(){
   if(PUBLIC){            // Pages: sem servidor, sem atualização pela web
     serverOn = false;
+    if(!DATA.length){    // build público embute DATA=[] e busca o feed estático (index.html enxuto)
+      try{ DATA = await (await fetch("api/data.json", {cache:"no-cache"})).json(); }
+      catch(e){ toast("Não foi possível carregar os dados.", "error"); }
+    }
     showLastUpdate();
+    populateEffectFilters();
     render();
     return;
   }
@@ -2515,9 +2520,14 @@ def write_assets(adir=None):
 
 
 def render_html(rows, brl_rate, token="", public=False):
-    data = json.dumps(rows, ensure_ascii=False)
-    # anti-XSS: impede quebra do </script> e injeção via conteúdo do JSON
-    data = data.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+    if public:
+        # Pages (http): DATA vem de api/data.json via fetch -> index.html fica enxuto. file:// não
+        # entra aqui (build estático local embute DATA p/ funcionar ao abrir o arquivo direto).
+        data = "[]"
+    else:
+        data = json.dumps(rows, ensure_ascii=False)
+        # anti-XSS: impede quebra do </script> e injeção via conteúdo do JSON (só p/ DATA inline)
+        data = data.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     out = _SHELL
     for k, v in {
         # URL pública (og:image/og:url) — trocar aqui se migrar para domínio próprio
@@ -2687,9 +2697,15 @@ def cmd_book(names):
 def write_static(rows, brl_rate, public=False):
     rows.sort(key=lambda r: r["gold"] / r["usd"] if r["usd"] else 0, reverse=True)
     write_assets()                       # assets/styles.css + assets/app.js (cacheáveis)
+    if public:                           # feed público (N1): o site busca; outros podem consumir
+        api_dir = os.path.join(HERE, "api")
+        os.makedirs(api_dir, exist_ok=True)
+        with open(os.path.join(api_dir, "data.json"), "w", encoding="utf-8") as f:
+            json.dump(rows, f, ensure_ascii=False)
     out = os.path.join(HERE, "index.html")
     open(out, "w", encoding="utf-8").write(render_html(rows, brl_rate, public=public))
-    print(f"[ok] gerado: {out} + assets/{{styles.css,app.js}}" + (" (público)" if public else ""))
+    extra = " + api/data.json (público)" if public else ""
+    print(f"[ok] gerado: {out} + assets/{{styles.css,app.js}}{extra}")
 
 
 # --- Servidor local seguro ---------------------------------------------------------------

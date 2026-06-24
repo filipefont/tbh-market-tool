@@ -926,6 +926,7 @@ def attach_trends(rows, windows=(("chg24", 86400), ("chg7", 7 * 86400))):
 HTML_TEMPLATE = r"""<!doctype html>
 <html lang="pt-br"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e1014">
 <title>TBH Market Tool — Itens × Mercado Steam</title>
 <meta name="description" content="Ranking dos itens do Task Bar Hero cruzados com o Mercado Steam: retorno em gold e em gold por real (gold/R$). Preços atualizados automaticamente.">
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
@@ -942,15 +943,22 @@ HTML_TEMPLATE = r"""<!doctype html>
 <meta name="twitter:description" content="Ranking de itens do Task Bar Hero por retorno em gold e gold/R$.">
 <meta name="twitter:image" content="__SITE__/assets/og.png">
 <style>
-  :root { color-scheme: dark; --row:#13151a; --row-alt:#161922; --row-hover:#1c2029; }
+  /* Identidade "terminal de mercado": base escura, acento ESMERALDA (ticker), ouro p/ destaque,
+     números em mono tabular. Cores de grade dos itens (raridade) ficam à parte. */
+  :root { color-scheme: dark; --row:#0e1014; --row-alt:#161922; --row-hover:#1c2029;
+          --accent:#19c37d; --accent-ink:#08130d; --gold:#f4c430;
+          --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace; }
   * { box-sizing: border-box; }
-  body { font-family: system-ui, Segoe UI, sans-serif; margin:0; background:#13151a; color:#e6e8ee; }
+  body { font-family: system-ui, Segoe UI, sans-serif; margin:0; background:#0e1014; color:#e6e8ee; }
+  /* números (preços, gold, Δ, contagens) em mono tabular — reforça o ar de "terminal" */
+  .money, .ppr, td.g, .g.abbr, .lvl, .abbr, .trend, .gprice, #eCount, .mvchip b, .age {
+    font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
   header { padding:14px 20px; background:#1b1e26; border-bottom:1px solid #2a2e3a; }
   h1 { margin:0 0 4px; font-size:18px; }
   .meta { font-size:12px; color:#9aa3b8; }
   .chip { display:inline-block; font-size:11px; padding:2px 8px; border-radius:10px;
           background:#22263180; border:1px solid #2a2e3a; color:#c2c9da; }
-  a { color:#7ab8ff; text-decoration:none; } a:hover { text-decoration:underline; }
+  a { color:#4fd1a5; text-decoration:none; } a:hover { text-decoration:underline; }
   .controls { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:10px 20px;
               background:#171a21; position:sticky; top:0; z-index:5; border-bottom:1px solid #2a2e3a; }
   .group { display:flex; gap:8px; align-items:center; }
@@ -960,10 +968,10 @@ HTML_TEMPLATE = r"""<!doctype html>
   button { cursor:pointer; } button:hover:not(:disabled) { background:#222634; }
   button:disabled { opacity:.5; cursor:default; }
   input:focus-visible, select:focus-visible, button:focus-visible, th:focus-visible {
-    outline:2px solid #5b9dff; outline-offset:1px; }
+    outline:2px solid #2bd48f; outline-offset:1px; }
   .seg { display:flex; border:1px solid #2a2e3a; border-radius:6px; overflow:hidden; }
   .seg button { border:0; border-radius:0; padding:7px 14px; }
-  .seg button.on { background:#2f6df0; color:#fff; }
+  .seg button.on { background:#19c37d; color:var(--accent-ink); }
   .wrap { overflow:auto; max-height:calc(100vh - 168px); }
   table { border-collapse:collapse; width:100%; font-size:13px; }
   th, td { padding:8px 12px; text-align:right; white-space:nowrap; border-bottom:1px solid #21242e; }
@@ -973,7 +981,7 @@ HTML_TEMPLATE = r"""<!doctype html>
      ficar escondida atrás do cabeçalho ao voltar ao topo */
   tbody tr { scroll-margin-top: 44px; }
   thead th:hover { background:#242838; }
-  th .arrow { color:#5b9dff; font-size:11px; }
+  th .arrow { color:#2bd48f; font-size:11px; }
   th .hint { color:#5b6378; font-size:11px; cursor:help; margin-left:3px; }
   /* coluna "Item" fixa ao rolar na horizontal */
   thead th:first-child { left:0; z-index:3; }
@@ -991,7 +999,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   .rank1 { font-size:13px; margin-right:2px; }
   /* linha selecionada pelo teclado (↑/↓) — vem depois do zebra/best p/ vencer no empate */
   tbody tr.sel td { background:#21304d; }
-  tbody tr.sel td:first-child { background:#21304d; box-shadow:inset 3px 0 0 #5b9dff; }
+  tbody tr.sel td:first-child { background:#21304d; box-shadow:inset 3px 0 0 #2bd48f; }
   /* célula do item: estrela + nome colorido + botão Steam (flex no wrapper, td segue célula) */
   td.itemcell .itemwrap { display:flex; align-items:center; gap:6px; }
   .icon { width:30px; height:30px; flex:0 0 30px; border-radius:6px; object-fit:contain;
@@ -1004,9 +1012,9 @@ HTML_TEMPLATE = r"""<!doctype html>
   .fav.on { color:#f4c430; }
   a.steam { display:inline-flex; align-items:center; gap:3px; font-size:11px; color:#9aa3b8;
             border:1px solid #2a2e3a; border-radius:5px; padding:2px 7px; white-space:nowrap; }
-  a.steam:hover { color:#fff; background:#2f6df0; border-color:#2f6df0; text-decoration:none; }
+  a.steam:hover { color:var(--accent-ink); background:#19c37d; border-color:#19c37d; text-decoration:none; }
   /* botão de alternância (filtro de favoritos) */
-  button.toggle.on { background:#2f6df0; color:#fff; border-color:#2f6df0; }
+  button.toggle.on { background:#19c37d; color:var(--accent-ink); border-color:#19c37d; }
   /* disponibilidade / liquidez: bolinha por faixa + botão de verificação ao vivo */
   .liq { display:inline-block; width:9px; height:9px; border-radius:50%; cursor:help;
          vertical-align:middle; margin-right:4px; }
@@ -1024,7 +1032,8 @@ HTML_TEMPLATE = r"""<!doctype html>
   .tabs { display:flex; gap:4px; padding:6px 20px 0; }
   .tab { background:transparent; border:1px solid transparent; border-bottom:none; color:#9aa3b8;
          padding:7px 14px; border-radius:8px 8px 0 0; cursor:pointer; font-size:13px; }
-  .tab.on { color:#e8ebf2; background:#ffffff0d; border-color:#ffffff1f; font-weight:600; }
+  .tab.on { color:#e8ebf2; background:#ffffff0d; border-color:#ffffff1f; font-weight:600;
+            box-shadow:inset 0 -2px 0 var(--accent); }
   /* alternância de view: por padrão mostra o Mercado; .view-effects troca p/ a aba de Efeitos */
   #effectsView { display:none; }
   body.view-effects #effectsView { display:block; }
@@ -1051,7 +1060,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   .mvchip.up { color:#5fd38d; } .mvchip.down { color:#e07a7a; }
   /* colunas de preço "real" levemente destacadas vs estimado */
   td.real, th.real { background:#1a1f1a40; }
-  .g { color:#f4c430; } .money { color:#5fd38d; } .ppr { color:#7ab8ff; font-weight:600; }
+  .g { color:#f4c430; } .money { color:#5fd38d; } .ppr { color:#4fd1a5; font-weight:600; }
   .check { color:#5fd38d; font-size:11px; margin-left:4px; }
   .conv { color:#c2a24b; font-weight:600; cursor:help; }   /* preço convertido (≈) */
   .badge { font-size:11px; padding:1px 8px; border-radius:10px; background:#2a2e3a;
@@ -1075,7 +1084,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   /* mini barra de proporção na coluna gold/moeda (est.) */
   td.bar { position:relative; }
   td.bar::before { content:""; position:absolute; left:0; top:3px; bottom:3px; width:var(--p,0);
-    background:linear-gradient(90deg, #7ab8ff33, #7ab8ff0d); border-radius:0 3px 3px 0; z-index:0; }
+    background:linear-gradient(90deg, #4fd1a533, #4fd1a50d); border-radius:0 3px 3px 0; z-index:0; }
   td.bar > .v { position:relative; z-index:1; }
   .empty { text-align:center; color:#9aa3b8; padding:32px 12px; }
   /* dropdown multi-seleção (filtros padronizados) */
@@ -1123,7 +1132,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   /* toasts (substituem alert()) */
   #toasts { position:fixed; right:16px; bottom:16px; z-index:50; display:flex;
             flex-direction:column; gap:8px; max-width:min(92vw,380px); }
-  .toast { background:#1b1e26; border:1px solid #2a2e3a; border-left:3px solid #5b9dff;
+  .toast { background:#1b1e26; border:1px solid #2a2e3a; border-left:3px solid #2bd48f;
            border-radius:8px; padding:10px 12px; font-size:13px; color:#e6e8ee;
            box-shadow:0 6px 24px #0008; white-space:pre-line; animation:tin .18s ease-out; }
   .toast.error { border-left-color:#e07a7a; } .toast.ok { border-left-color:#5fd38d; }
@@ -1174,7 +1183,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   .dgrid { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:13px; }
   .dgrid .k { color:#9aa3b8; } .dgrid .v { text-align:right; font-variant-numeric:tabular-nums; }
   .dattr { display:flex; justify-content:space-between; gap:10px; font-size:13px; padding:2px 0; }
-  .dattr .an { color:#cdd6ff; } .dattr .av { font-weight:600; color:#7ab8ff; }
+  .dattr .an { color:#cdd6ff; } .dattr .av { font-weight:600; color:#4fd1a5; }
   #detail .dactions { display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
   #detail .dactions a, #detail .dactions button { font-size:12px; }
   .spark { width:100%; height:54px; display:block; }
@@ -2174,7 +2183,7 @@ function drawSpark(box, raw){
   const last=vs[vs.length-1];
   box.innerHTML=`<h3>Histórico de preço (${sym().trim()})</h3>
     <div class="sparkwrap"><svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      <path d="${dpath}" fill="none" stroke="#7ab8ff" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>
+      <path d="${dpath}" fill="none" stroke="#4fd1a5" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>
       <div class="meta" style="display:flex;justify-content:space-between;margin-top:5px">
         <span>mín ${sym()}${minV.toFixed(2)}</span><span>máx ${sym()}${maxV.toFixed(2)}</span><span>último ${sym()}${last.toFixed(2)}</span>
       </div></div>`;

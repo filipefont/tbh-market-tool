@@ -10,7 +10,7 @@
 
   <!-- logo mark -->
   <g transform="translate(96,150)">
-    <rect width="120" height="120" rx="26" fill="#13151a" stroke="#2a2f3a" stroke-width="2"/>
+    <rect width="120" height="120" rx="26" fill="#0e1014" stroke="#2a2f3a" stroke-width="2"/>
     <rect x="24" y="64" width="17" height="32" rx="4" fill="#f0b429"/>
     <rect x="52" y="46" width="17" height="50" rx="4" fill="#f0b429"/>
     <rect x="80" y="26" width="17" height="70" rx="4" fill="#ffd766"/>
@@ -23,11 +23,11 @@
 
   <!-- value props -->
   <g font-size="30" font-weight="600">
-    <rect x="96" y="350" width="330" height="74" rx="14" fill="#13151a" stroke="#2a2f3a" stroke-width="2"/>
+    <rect x="96" y="350" width="330" height="74" rx="14" fill="#0e1014" stroke="#2a2f3a" stroke-width="2"/>
     <text x="128" y="396" fill="#ffd766">📈 Ranking por gold</text>
-    <rect x="446" y="350" width="380" height="74" rx="14" fill="#13151a" stroke="#2a2f3a" stroke-width="2"/>
+    <rect x="446" y="350" width="380" height="74" rx="14" fill="#0e1014" stroke="#2a2f3a" stroke-width="2"/>
     <text x="478" y="396" fill="#7ee787">💰 gold por R$ / US$</text>
-    <rect x="846" y="350" width="258" height="74" rx="14" fill="#13151a" stroke="#2a2f3a" stroke-width="2"/>
+    <rect x="846" y="350" width="258" height="74" rx="14" fill="#0e1014" stroke="#2a2f3a" stroke-width="2"/>
     <text x="878" y="396" fill="#9aa4b2">⏱ preços frescos</text>
   </g>
 

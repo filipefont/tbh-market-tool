@@ -251,14 +251,22 @@ def listings_overview(name, curkey="brl"):
 # A página de listagem SSR embute o order book num blob React Query (chave
 # ["market","orderbook",APPID,hash_name]). Daí saem: maior encomenda, total de encomendas
 # (demanda) e o book de compra/venda. Sem nameid, por hash_name. Ver .spec/encomendas-steam.md.
+# amtMaxBuyOrder/amtMinSellOrder vêm `null` quando o item não tem encomenda OU não tem venda
+# (ex.: item só com buy orders e cSellOrders:0). Aceitar `null` é essencial: senão o regex não
+# casa e o item — justamente um com encomenda ativa — é descartado e nunca atualiza.
 ORDERBOOK_RE = re.compile(
-    r'"amtMaxBuyOrder":(?P<max>-?\d+),'
-    r'"amtMinSellOrder":(?P<min>-?\d+),'
+    r'"amtMaxBuyOrder":(?P<max>-?\d+|null),'
+    r'"amtMinSellOrder":(?P<min>-?\d+|null),'
     r'"eCurrency":(?P<cur>\d+),'
     r'"cBuyOrders":(?P<nbuy>\d+),'
     r'"cSellOrders":(?P<nsell>\d+),'
     r'"rgCompactBuyOrders":\[(?P<buy>[\d,]*)\],'
     r'"rgCompactSellOrders":\[(?P<sell>[\d,]*)\]')
+
+
+def _cents(v):
+    """'1297' -> 12.97; 'null' (sem encomenda/venda) -> None."""
+    return None if v == "null" else int(v) / 100.0
 
 
 def _compact_pairs(s):
@@ -287,9 +295,9 @@ def parse_orderbook(html, name):
     buy = _compact_pairs(m["buy"])
     return {
         "cur": int(m["cur"]),
-        "buyMax": int(m["max"]) / 100.0,
+        "buyMax": _cents(m["max"]),
         "buyOrders": int(m["nbuy"]),
-        "sellMin": int(m["min"]) / 100.0,
+        "sellMin": _cents(m["min"]),
         "sellOrders": int(m["nsell"]),
         "buyBook": buy[:BOOK_DEPTH],
         "buyNotional": round(sum(p * q for p, q in buy), 2),
@@ -2146,8 +2154,8 @@ def enrich(rows, top_n, curkey):
 
 
 def _spread_pct(bk):
-    sm = bk.get("sellMin")
-    return round((sm - bk["buyMax"]) / sm * 100) if sm else None
+    sm, bm = bk.get("sellMin"), bk.get("buyMax")
+    return round((sm - bm) / sm * 100) if sm and bm is not None else None
 
 
 def enrich_orderbook(rows, top_n):
@@ -2172,7 +2180,8 @@ def enrich_orderbook(rows, top_n):
         updates.setdefault(r["name"], {})[curkey] = bk
         r["book"] = book[r["name"]]
         sp = _spread_pct(bk)
-        print(f"  + {r['name']}: maior enc {bk['buyMax']:.2f} {curkey.upper()} · "
+        bm = f"{bk['buyMax']:.2f}" if bk['buyMax'] is not None else "—"
+        print(f"  + {r['name']}: maior enc {bm} {curkey.upper()} · "
               f"{bk['buyOrders']} enc · spread {sp if sp is not None else '—'}%")
         done += 1
     save_orderbook(book)
@@ -2191,10 +2200,17 @@ def cmd_book(names):
             continue
         sym = "$" if curkey == "usd" else "R$"
         sp = _spread_pct(bk)
+        bm, sm = bk["buyMax"], bk["sellMin"]
         print(f"    moeda           : {curkey.upper()}")
-        print(f"    maior encomenda : {sym} {bk['buyMax']:.2f}  (líquido ~{sym} {bk['buyMax'] * 0.85:.2f})")
+        if bm is not None:
+            print(f"    maior encomenda : {sym} {bm:.2f}  (líquido ~{sym} {bm * 0.85:.2f})")
+        else:
+            print(f"    maior encomenda : — (sem encomenda)")
         print(f"    encomendas      : {bk['buyOrders']}")
-        print(f"    menor venda     : {sym} {bk['sellMin']:.2f}  ({bk['sellOrders']} ofertas)")
+        if sm is not None:
+            print(f"    menor venda     : {sym} {sm:.2f}  ({bk['sellOrders']} ofertas)")
+        else:
+            print(f"    menor venda     : — (sem venda)")
         print(f"    spread          : {sp if sp is not None else '—'}%")
         print(f"    valor do book   : {sym} {bk['buyNotional']:.2f}")
         updates.setdefault(name, {})[curkey] = bk

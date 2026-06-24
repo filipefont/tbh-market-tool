@@ -66,6 +66,21 @@ if bk:
 check(build.parse_orderbook("sem order book aqui", "Widget A") is None,
       "parse_orderbook deveria retornar None sem âncora")
 
+# 4b) item SÓ com encomenda (sem venda): amtMinSellOrder=null e rgCompactSellOrders vazio.
+# Era o caso que o regex descartava -> item nunca atualizava. Deve casar e dar sellMin=None.
+_blob_null = (
+    r'{\"amtMaxBuyOrder\":1297,\"amtMinSellOrder\":null,\"eCurrency\":7,'
+    + r'\"cBuyOrders\":130,\"cSellOrders\":0,'
+    + r'\"rgCompactBuyOrders\":[1297,1,1053,2],\"rgCompactSellOrders\":[]}'
+    + r'...\"queryKey\":[\"market\",\"orderbook\",%d,\"Widget B\"]...' % build.APPID)
+bn = build.parse_orderbook(_blob_null, "Widget B")
+check(bn is not None, "parse_orderbook descartou item com amtMinSellOrder=null (só encomenda)")
+if bn:
+    check(bn["buyMax"] == 12.97, f"parse_orderbook buyMax errado (null sell): {bn.get('buyMax')}")
+    check(bn["sellMin"] is None, f"parse_orderbook sellMin deveria ser None: {bn.get('sellMin')}")
+    check(bn["sellOrders"] == 0, f"parse_orderbook sellOrders errado: {bn.get('sellOrders')}")
+    check(build._spread_pct(bn) is None, "spread sem venda deveria ser None")
+
 if fails:
     print("SMOKE: FALHOU")
     for f in fails:

@@ -7,3 +7,5 @@ _site/
 
 # cache de runtime das encomendas (gerado pelo build/CI)
 data/orderbook.json
+# 1º avistamento dos itens no mercado (selo "NOVO" pós-reabertura) — runtime
+data/first_seen.json

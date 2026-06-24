@@ -1020,6 +1020,26 @@ HTML_TEMPLATE = r"""<!doctype html>
   .lvl { color:#c2c9da; }
   .trend { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; cursor:help; }
   .trend.up { color:#5fd38d; } .trend.down { color:#e07a7a; } .trend.flat { color:#9aa3b8; }
+  /* abas (Mercado / Efeitos) */
+  .tabs { display:flex; gap:4px; padding:6px 20px 0; }
+  .tab { background:transparent; border:1px solid transparent; border-bottom:none; color:#9aa3b8;
+         padding:7px 14px; border-radius:8px 8px 0 0; cursor:pointer; font-size:13px; }
+  .tab.on { color:#e8ebf2; background:#ffffff0d; border-color:#ffffff1f; font-weight:600; }
+  /* alternância de view: por padrão mostra o Mercado; .view-effects troca p/ a aba de Efeitos */
+  #effectsView { display:none; }
+  body.view-effects #effectsView { display:block; }
+  body.view-effects #marketControls, body.view-effects #activeFilters,
+  body.view-effects #movers, body.view-effects .wrap { display:none; }
+  /* grade de gemas */
+  #effectsGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; padding:6px 20px 24px; }
+  .gemcard { border:1px solid #ffffff14; background:#ffffff07; border-radius:10px; padding:10px 12px; cursor:pointer; }
+  .gemcard:hover { background:#ffffff0e; }
+  .gemcard .gh { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .gemcard .gname { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .gemcard .gprice { margin-left:auto; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .gemcard .geff { display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:2px 0; border-top:1px solid #ffffff0a; }
+  .gemcard .geff .gs { color:#9aa3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .gemcard .geff .gv { color:#cdd3e0; white-space:nowrap; }
   /* faixa de "top movers" (maiores variações) — chips clicáveis */
   #movers { padding:0 20px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
   #movers:empty { display:none; }
@@ -1170,7 +1190,11 @@ HTML_TEMPLATE = r"""<!doctype html>
   </div>
   <div class="meta" id="baseline" style="margin-top:6px"></div>
 </header>
-<div class="controls">
+<nav class="tabs" role="tablist" aria-label="seções">
+  <button id="tabMarket" class="tab on" role="tab" aria-selected="true" data-tip="ranking de itens × mercado">Mercado</button>
+  <button id="tabEffects" class="tab" role="tab" aria-selected="false" data-tip="gemas/decorações: efeito por slot + preço">Efeitos (gemas)</button>
+</nav>
+<div class="controls" id="marketControls">
   <div class="group">
     <input type="text" id="q" placeholder="buscar por nome..." aria-label="buscar por nome">
     <div class="dropdown" id="f_grade"></div>
@@ -1229,6 +1253,23 @@ HTML_TEMPLATE = r"""<!doctype html>
   <th data-k="liq" tabindex="0">Disp.<span class="hint" data-tip="disponibilidade/liquidez: bolinha pela heurística (listagens + volume); 🛒 confirma ofertas reais compráveis ao vivo">ⓘ</span></th>
 </tr></thead><tbody></tbody></table>
 </div>
+<section id="effectsView" aria-label="efeitos das gemas">
+  <div class="controls">
+    <div class="group">
+      <input type="text" id="eq" placeholder="buscar gema..." aria-label="buscar gema por nome">
+      <select id="eSlot" aria-label="filtrar por slot"><option value="">slot: todos</option></select>
+      <select id="eStat" aria-label="filtrar por atributo"><option value="">atributo: todos</option></select>
+      <select id="eSort" aria-label="ordenar">
+        <option value="price">menor preço</option>
+        <option value="buyNet">maior encomenda líquida</option>
+        <option value="ppr">melhor gold/moeda</option>
+        <option value="name">nome (A–Z)</option>
+      </select>
+      <span class="chip" id="eCount"></span>
+    </div>
+  </div>
+  <div id="effectsGrid"></div>
+</section>
 <div id="toasts"></div>
 <div id="detailOverlay"></div>
 <aside id="detail" role="dialog" aria-modal="true" aria-label="detalhes do item" hidden></aside>
@@ -1649,6 +1690,56 @@ function currentRows(){
   return rows;
 }
 
+// ---- Aba de Efeitos (gemas/decorações) --------------------------------------------------
+let curView = "market";
+function setView(v){
+  curView = v;
+  document.body.classList.toggle("view-effects", v==="effects");
+  for(const [id,on] of [["tabMarket",v==="market"],["tabEffects",v==="effects"]]){
+    $(id).classList.toggle("on", on); $(id).setAttribute("aria-selected", String(on)); }
+  try{ localStorage.setItem("tbh_view", v); }catch(e){}
+  if(v==="effects") renderEffects(); else render();
+}
+function gemRows(){ return DATA.filter(d=>d.effects && d.effects.length); }
+function populateEffectFilters(){
+  const gems = gemRows();
+  if($("eSlot").options.length > 1 || !gems.length) return;   // idempotente; espera DATA chegar
+  const slots = [...new Set(gems.flatMap(d=>d.effects.map(g=>g.slot)).filter(Boolean))].sort();
+  const stats = [...new Set(gems.flatMap(d=>d.effects.map(g=>g.stat)).filter(Boolean))].sort();
+  $("eSlot").insertAdjacentHTML("beforeend", slots.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join(""));
+  $("eStat").insertAdjacentHTML("beforeend", stats.map(s=>`<option value="${esc(s)}">${esc(attrLabel(s))}</option>`).join(""));
+}
+function renderEffects(){
+  const q=$("eq").value.toLowerCase(), slot=$("eSlot").value, stat=$("eStat").value, sortBy=$("eSort").value;
+  const gems = gemRows().map(derive).filter(d=>
+    (!q || d.name.toLowerCase().includes(q)) &&
+    (!slot || d.effects.some(g=>g.slot===slot)) &&
+    (!stat || d.effects.some(g=>g.stat===stat)));
+  const asc = sortBy==="price" || sortBy==="name";
+  const val = d => sortBy==="price" ? (d.priceEst ?? Infinity)
+              : sortBy==="buyNet" ? (d.buyNet ?? -Infinity)
+              : sortBy==="ppr" ? (d.goldPerEst ?? -Infinity) : d.name;
+  gems.sort((a,b)=>{ const x=val(a),y=val(b); return (typeof x==="string"? x.localeCompare(y) : x-y) * (asc?1:-1); });
+  $("eCount").textContent = `${gems.length} gemas`;
+  $("effectsGrid").innerHTML = gems.map(gemCard).join("") || `<div class="meta" style="padding:20px">Nenhuma gema corresponde.</div>`;
+  $("effectsGrid").querySelectorAll(".gemcard").forEach(c=>{
+    const open=()=>{ const d=DATA.find(x=>x.name===c.dataset.name); if(d) openDetail(d); };
+    c.onclick=open; c.onkeydown=e=>{ if(e.key==="Enter") open(); };
+  });
+}
+function gemCard(d){
+  const gc=GRADE_COLORS[d.grade]||"#cdd3e0";
+  const icon = d.icon
+    ? `<img class="icon" src="${ICON_BASE}${encodeURIComponent(d.icon)}.png" alt="" loading="lazy" style="border-color:${gc}66" onerror="this.classList.add('noimg');this.removeAttribute('src')">`
+    : `<span class="icon noimg"></span>`;
+  const price = d.priceEst!=null ? sym()+d.priceEst.toFixed(2) : '<span class="muted">—</span>';
+  const net = d.buyNet!=null ? `<div class="geff"><span class="gs">encomenda líquida</span><span class="gv">${sym()}${d.buyNet.toFixed(2)}</span></div>` : "";
+  const effs = d.effects.map(g=>`<div class="geff"><span class="gs">${esc(g.slot||"")} · ${esc(attrLabel(g.stat||""))}${g.chance!=null&&g.chance<1?` (${Math.round(g.chance*100)}%)`:""}</span><span class="gv">${esc(g.disp||"")}</span></div>`).join("");
+  return `<div class="gemcard" data-name="${esc(d.name)}" tabindex="0" title="ver detalhes">
+    <div class="gh">${icon}<span class="gname" style="color:${gc}">${esc(d.name)}</span><span class="gprice">${price}</span></div>
+    ${effs}${net}</div>`;
+}
+
 // Top movers: maiores altas/quedas de preço. Usa "desde a reabertura" (chgReopen) quando há dado;
 // senão cai p/ 24h. Independe dos filtros (lê o DATA inteiro). Chips abrem o item.
 function renderMovers(){
@@ -1839,6 +1930,12 @@ $("realmode").querySelectorAll("button").forEach(b=>b.onclick=()=>{
 });
 $("q").addEventListener("input", rerenderDebounced);
 $("avail").addEventListener("input", rerender);
+// abas (Mercado / Efeitos) + filtros da aba de Efeitos
+$("tabMarket").onclick = ()=>setView("market");
+$("tabEffects").onclick = ()=>setView("effects");
+["eq","eSlot","eStat","eSort"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="effects") renderEffects(); }));
+populateEffectFilters();
+try{ if(localStorage.getItem("tbh_view")==="effects" && gemRows().length) setView("effects"); }catch(e){}
 $("rate").addEventListener("input", ()=>{ rate=parseFloat($("rate").value)||rate; rerenderDebounced(); });
 $("clear").onclick = clearFilters;
 $("favFilter").onclick = ()=>{
@@ -2340,7 +2437,7 @@ function showLastUpdate(){
     $("calib").disabled = false;
     $("refreshVisible").disabled = false;
     $("autoBtn").disabled = false;
-    const d = await api("/api/data"); if(d && d.rows){ DATA = d.rows; }
+    const d = await api("/api/data"); if(d && d.rows){ DATA = d.rows; populateEffectFilters(); }
     if(autoOn) setAuto(true);   // retoma o auto se estava ligado na visita anterior
   }catch(e){
     $("status").innerHTML = `<span class="dot off"></span>modo estático — rode <code>python3 build.py serve</code> para atualizar preços`;

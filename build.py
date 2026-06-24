@@ -2145,7 +2145,7 @@ function openDetail(raw){
       ${effHtml?`<div class="dsec"><h3>Efeitos (gema)</h3>${effHtml}</div>`:""}
       ${farmHtml?`<div class="dsec"><h3>Onde dropa (farm)</h3>${farmHtml}</div>`:""}
       <div class="dsec"><h3>Economia</h3><div class="dgrid">${kvHtml(econ)}</div></div>
-      <div class="dsec" id="dHist"><h3>Histórico de preço</h3><div class="meta">${serverOn?'carregando…':'disponível no modo servidor'}</div></div>
+      <div class="dsec" id="dHist"><h3>Histórico de preço</h3><div class="meta">carregando…</div></div>
       <div class="dactions">
         <a class="steam" href="${steamUrl(d.name)}" target="_blank" rel="noopener noreferrer">↗ Steam</a>
         <button id="dCopy">⧉ copiar nome</button>
@@ -2162,7 +2162,7 @@ function openDetail(raw){
     (navigator.clipboard?navigator.clipboard.writeText(url):Promise.reject())
     .then(()=>toast("Link copiado.","ok"), ()=>toast("Não foi possível copiar.","error")); };
   $("dFav").onclick=()=>{ toggleFav(d.name); openDetail(raw); };
-  if(serverOn) loadHistory(d.name);
+  if(serverOn) loadHistory(d.name); else loadHistoryStatic(d.name);
 }
 async function loadHistory(name){
   const box=$("dHist"); if(!box) return;
@@ -2170,6 +2170,23 @@ async function loadHistory(name){
     const r=await api(`/api/history?currency=${cur}&name=${encodeURIComponent(name)}`);
     drawSpark(box, (r&&r.points)||[]);
   }catch(e){ box.innerHTML=`<h3>Histórico de preço</h3><div class="meta">sem histórico</div>`; }
+}
+// público: histórico do feed estático (api/history.json), buscado 1x e cacheado. Série em USD ->
+// converte p/ a moeda atual (como as estimativas) antes de desenhar a mesma sparkline.
+let HIST = null;
+async function ensureHist(){
+  if(HIST===null){
+    try{ HIST = await (await fetch("api/history.json", {cache:"no-cache"})).json(); }
+    catch(e){ HIST = {}; }
+  }
+  return HIST;
+}
+async function loadHistoryStatic(name){
+  const box=$("dHist"); if(!box) return;
+  const h=await ensureHist();
+  const f = cur==="brl" ? (rate>0?rate:1) : 1;
+  const pts=(h[name]||[]).map(([ts,v])=>({ts, low:v*f}));
+  drawSpark(box, pts);
 }
 function drawSpark(box, raw){
   const pts=(raw||[]).map(p=>({t:p.ts, v:(p.low!=null?p.low:p.med)})).filter(p=>p.v!=null);
@@ -2694,17 +2711,39 @@ def cmd_book(names):
         merge_orderbook(updates)
 
 
+HISTORY_FEED_MAX = 60   # pontos por item no feed de histórico (limita o tamanho conforme acumula)
+
+
+def _history_feed():
+    """Série de preço (USD) por item, p/ os gráficos do site público: {name: [[ts, v], ...]}.
+    Só itens com >=2 pontos; mantém os últimos HISTORY_FEED_MAX. Best-effort (vazio se faltar BD)."""
+    if not os.path.exists(HISTORY_DB):
+        return {}
+    feed = {}
+    try:
+        with sqlite3.connect(HISTORY_DB) as conn:
+            for name, ts, v in conn.execute(
+                "SELECT name, ts, COALESCE(low, med) FROM price_history "
+                "WHERE currency='usd' AND COALESCE(low, med) IS NOT NULL ORDER BY name, ts"):
+                feed.setdefault(name, []).append([ts, round(v, 2)])
+    except sqlite3.Error:
+        return {}
+    return {n: pts[-HISTORY_FEED_MAX:] for n, pts in feed.items() if len(pts) >= 2}
+
+
 def write_static(rows, brl_rate, public=False):
     rows.sort(key=lambda r: r["gold"] / r["usd"] if r["usd"] else 0, reverse=True)
     write_assets()                       # assets/styles.css + assets/app.js (cacheáveis)
-    if public:                           # feed público (N1): o site busca; outros podem consumir
+    if public:                           # feeds públicos (N1): o site busca; outros podem consumir
         api_dir = os.path.join(HERE, "api")
         os.makedirs(api_dir, exist_ok=True)
         with open(os.path.join(api_dir, "data.json"), "w", encoding="utf-8") as f:
             json.dump(rows, f, ensure_ascii=False)
+        with open(os.path.join(api_dir, "history.json"), "w", encoding="utf-8") as f:
+            json.dump(_history_feed(), f, ensure_ascii=False)
     out = os.path.join(HERE, "index.html")
     open(out, "w", encoding="utf-8").write(render_html(rows, brl_rate, public=public))
-    extra = " + api/data.json (público)" if public else ""
+    extra = " + api/{data,history}.json (público)" if public else ""
     print(f"[ok] gerado: {out} + assets/{{styles.css,app.js}}{extra}")
 
 

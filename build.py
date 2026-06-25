@@ -1421,10 +1421,11 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
   html[data-ui="cubo"] .lock { font-size:11px; color:#e0a86a; }
   /* mini-sparkline (Fase 3) */
   html[data-ui="cubo"] .cc-spark { display:inline-block; }
-  html[data-ui="cubo"] .cbspark { width:72px; height:24px; display:block; }
-  html[data-ui="cubo"] .ch-spark .cbspark { width:180px; height:60px; }
-  html[data-ui="cubo"] .cc-metric .cc-right { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+  html[data-ui="cubo"] .cbspark { width:84px; height:30px; display:block; }      /* tamanho do modelo (cartão) */
+  html[data-ui="cubo"] .ch-spark .cbspark { width:200px; height:90px; }          /* hero (modelo) */
+  html[data-ui="cubo"] .cc-metric .cc-right { display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
   html[data-ui="cubo"] .ch-spark { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  html[data-ui="cubo"] .cc-grade { font-weight:600; }   /* grade abaixo do nome, como no modelo */
   /* respeita "reduzir movimento": desliga pulsos/flutuações (o count-up é tratado no JS) */
   @media (prefers-reduced-motion: reduce){
     .dot, [style*="animation"] { animation:none !important; }
@@ -1503,6 +1504,22 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
   html[data-ui="cubo"] .cb-connect { background:var(--accent); color:var(--accent-ink); border-color:var(--accent);
     font-weight:600; border-radius:9px; }
   html[data-ui="cubo"] .cb-connect:hover:not(:disabled) { background:var(--accent); filter:brightness(1.06); }
+  /* ---- abas Efeitos e Craft no estilo Cubo ---- */
+  html[data-ui="cubo"] .gemcard, html[data-ui="cubo"] .craftcard {
+    background:var(--cb-surface); border:1px solid var(--cb-border); border-radius:14px; }
+  html[data-ui="cubo"] .gemcard:hover, html[data-ui="cubo"] .craftcard:hover { background:var(--cb-surface); border-color:#2dd4a766; }
+  html[data-ui="cubo"] .gemcard .gname { font-family:'Space Grotesk',sans-serif; color:var(--cb-text) !important; }
+  html[data-ui="cubo"] .craftcard .ctype { font-family:'Space Grotesk',sans-serif; color:var(--cb-text); }
+  html[data-ui="cubo"] .craftcard .ctier, html[data-ui="cubo"] .craftcard .clvl, html[data-ui="cubo"] .crafthint { color:var(--cb-faint); }
+  html[data-ui="cubo"] .gemcard .gsec { border-top-color:var(--cb-border-soft); }
+  html[data-ui="cubo"] .gemcard .glabel, html[data-ui="cubo"] .gemcard .gp .lbl, html[data-ui="cubo"] .craftcard .ce .lbl {
+    color:var(--cb-faint); font-family:'Figtree',sans-serif; }
+  html[data-ui="cubo"] .gemcard .gp, html[data-ui="cubo"] .craftcard .ce, html[data-ui="cubo"] .craftcard .crange { color:var(--cb-muted); }
+  html[data-ui="cubo"] .gemcard .gp b, html[data-ui="cubo"] .craftcard .ce b { color:var(--cb-text); }
+  html[data-ui="cubo"] .gemcard .gprices, html[data-ui="cubo"] .craftcard .cecon { font-family:'IBM Plex Mono',monospace; }
+  html[data-ui="cubo"] .craftcard .cmat { background:#0e131a; border-color:var(--cb-border); border-radius:8px; }
+  html[data-ui="cubo"] .craftcard .ce.win b { color:#3fbf7f; }
+  html[data-ui="cubo"] .craftcard .ce.cost b { color:#f0a93b; }
   html[data-ui="cubo"] body.view-effects .cb-filters, html[data-ui="cubo"] body.view-effects #cbSearchSlot,
   html[data-ui="cubo"] body.view-farm .cb-filters, html[data-ui="cubo"] body.view-farm #cbSearchSlot,
   html[data-ui="cubo"] body.view-craft .cb-filters, html[data-ui="cubo"] body.view-craft #cbSearchSlot,
@@ -2403,7 +2420,8 @@ function cuboIcon(d, gc, lg){
 }
 function cuboSub(d, gc){
   const t = d.gearType ? titleCase(d.gearType) : (d.type?titleCase(d.type):"");
-  return `<span class="cc-dot" style="background:${gc}"></span><span style="color:${gc}">${esc(d.grade||"—")}</span>`
+  const g = d.grade ? titleCase(d.grade) : "—";
+  return `<span class="cc-dot" style="background:${gc}"></span><span class="cc-grade" style="color:${gc}">${esc(g)}</span>`
        + `<span class="cc-mut"> · ${esc(t||"—")}${d.level!=null?" · lvl "+d.level:""}</span>`;
 }
 function cuboPrice(d){
@@ -2412,19 +2430,21 @@ function cuboPrice(d){
 }
 // Fase 3 — sparklines (de HIST/api/history.json), count-up e respeito a "reduzir movimento"
 function deltaColor(d){ const c=d.chg24; return c>0?"#3fbf7f":(c<0?"#ef6b6b":"#8a93a6"); }
-function cuboSparkSvg(name, color){
+function cuboSparkSvg(name, stroke, fill){
   const s = HIST && HIST[name]; if(!s || s.length<2) return "";
   const vs = s.map(p=>p[1]).filter(v=>v!=null); if(vs.length<2) return "";
-  const W=64,H=20, lo=Math.min(...vs), hi=Math.max(...vs), rng=(hi-lo)||1;
+  const W=64,H=22, lo=Math.min(...vs), hi=Math.max(...vs), rng=(hi-lo)||1;
   const pts = vs.map((v,i)=>{ const x=(i/(vs.length-1))*W;
-    const y=Math.max(1,Math.min(H-1, H-((v-lo)/rng)*H)); return x.toFixed(1)+","+y.toFixed(1); }).join(" ");
-  return `<svg class="cbspark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
+    const y=Math.max(1,Math.min(H-1, H-((v-lo)/rng)*H)); return x.toFixed(1)+","+y.toFixed(1); });
+  const line = pts.join(" "), area = line + " " + W + "," + H + " 0," + H;   // área = linha + base (modelo)
+  const poly = fill ? `<polygon points="${area}" fill="${fill}"></polygon>` : "";
+  return `<svg class="cbspark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${poly}<polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
 }
 // preenche os placeholders .cc-spark depois que o feed de histórico chega (1 fetch, cacheado)
 function injectCuboSparks(){
   document.querySelectorAll("#cuboView .cc-spark").forEach(el=>{
     if(el.dataset.done) return;
-    el.innerHTML = cuboSparkSvg(el.dataset.name, el.dataset.color||"#8a93a6");
+    el.innerHTML = cuboSparkSvg(el.dataset.name, el.dataset.color||"#8a93a6", el.dataset.fill||"");
     el.dataset.done = "1";
   });
 }
@@ -2450,7 +2470,7 @@ function cuboHeroHtml(d, gc){
         <div class="ch-sep"><div class="ch-big">${fmtAbbr(d.gold)}</div><div class="cc-lbl">gold no cubo · ${cuboPrice(d)}</div></div>
       </div>
     </div>
-    <div class="ch-spark"><span class="cc-spark" data-name="${esc(d.name)}" data-color="#2dd4a7"></span><span class="ch-delta">${trendCell(d)} · 24h</span></div>
+    <div class="ch-spark"><span class="cc-spark" data-name="${esc(d.name)}" data-color="#2dd4a7" data-fill="rgba(45,212,167,.14)"></span><span class="ch-delta">${trendCell(d)} · 24h</span></div>
   </div>`;
 }
 function cuboCardHtml(d, gc, rank){
@@ -2458,13 +2478,13 @@ function cuboCardHtml(d, gc, rank){
   return `<div class="cubocard" data-name="${esc(d.name)}" tabindex="0" role="button"
       aria-label="${esc(d.name)}" style="--gc:${gc}">
     <div class="cc-top">${cuboIcon(d,gc)}
-      <div class="cc-id"><div class="cc-name" style="color:${gc}">${highlightName(dispName(d))}</div>
+      <div class="cc-id"><div class="cc-name">${highlightName(dispName(d))}</div>
         <div class="cc-sub">${cuboSub(d,gc)}</div></div>
       <div class="cc-rk"><span class="cc-rank">#${rank}</span><span class="liq ${liq}" title="liquidez"></span></div>
     </div>
     <div class="cc-metric">
       <div><div class="cc-big">${d.goldPerEst!=null?fmtAbbr(d.goldPerEst):"—"}</div><div class="cc-lbl">gold / ${sym().trim()}</div></div>
-      <div class="cc-right"><span class="cc-spark" data-name="${esc(d.name)}" data-color="${deltaColor(d)}"></span>${trendCell(d)}</div>
+      <div class="cc-right"><span class="cc-spark" data-name="${esc(d.name)}" data-color="${deltaColor(d)}" data-fill="${gc}22"></span>${trendCell(d)}</div>
     </div>
     <div class="cc-foot"><span>Gold <b data-tip="${fmt(d.gold)} gold">${fmtAbbr(d.gold)}</b></span><span>Preço <b>${cuboPrice(d)}</b></span></div>
   </div>`;

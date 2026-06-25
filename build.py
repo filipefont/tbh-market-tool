@@ -1349,6 +1349,63 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
   html[data-ui="cubo"] thead th { background:var(--cb-surface); color:var(--cb-faint); }
   html[data-ui="cubo"] th, html[data-ui="cubo"] td { border-bottom-color:var(--cb-border-soft); }
   html[data-ui="cubo"] .bagdev { background:var(--cb-surface); border-color:var(--cb-border); }
+
+  /* ---- Fase 2: toggle cartões/tabela + hero + grade de cartões (só no layout Cubo) ---- */
+  .cubo-only { display:none !important; }
+  html[data-ui="cubo"] .cubo-only { display:inline-flex !important; }
+  #cuboView { display:none; padding:14px 20px 2px; }
+  body.cubo-cards #cuboView { display:block; }
+  body.cubo-cards .wrap { display:none; }
+  html[data-ui="cubo"] .cbtile { display:inline-flex; align-items:center; justify-content:center;
+    flex:0 0 auto; width:42px; height:42px; border-radius:11px; border:1px solid;
+    font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; }
+  html[data-ui="cubo"] .cbtile.lg { width:54px; height:54px; border-radius:13px; font-size:13px; }
+  html[data-ui="cubo"] .cc-dot { width:8px; height:8px; border-radius:3px; display:inline-block; flex:0 0 auto; }
+  html[data-ui="cubo"] .cc-mut, html[data-ui="cubo"] .cc-lbl { color:var(--cb-faint); }
+  /* hero "melhor negócio agora" */
+  html[data-ui="cubo"] .cubohero { display:grid; grid-template-columns:1fr auto; gap:18px; align-items:center;
+    background:linear-gradient(120deg,#11201b,#0e1318 72%); border:1px solid #1e2b27; border-radius:16px;
+    padding:20px 22px; margin-bottom:16px; cursor:pointer; }
+  html[data-ui="cubo"] .cubohero:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  html[data-ui="cubo"] .ch-badges { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  html[data-ui="cubo"] .ch-top { font-size:11px; font-weight:700; color:#1c1404; background:var(--gold); border-radius:6px; padding:3px 9px; }
+  html[data-ui="cubo"] .ch-deal { font-size:11px; font-weight:700; color:var(--accent-ink); background:var(--accent); border-radius:20px; padding:3px 10px; }
+  html[data-ui="cubo"] .ch-id { display:flex; align-items:center; gap:14px; margin-top:14px; }
+  html[data-ui="cubo"] .ch-name { font-family:'Space Grotesk',sans-serif; font-size:23px; font-weight:600; letter-spacing:-.3px; }
+  html[data-ui="cubo"] .ch-sub { display:flex; align-items:center; gap:6px; margin-top:5px; font-size:12.5px; }
+  html[data-ui="cubo"] .ch-nums { display:flex; gap:24px; margin-top:18px; flex-wrap:wrap; }
+  html[data-ui="cubo"] .ch-sep { border-left:1px solid #1e2b27; padding-left:24px; }
+  html[data-ui="cubo"] .ch-big { font-family:'Space Grotesk',sans-serif; font-size:32px; font-weight:700; line-height:1; }
+  html[data-ui="cubo"] .ch-big.accent { color:var(--accent); }
+  html[data-ui="cubo"] .ch-delta { align-self:flex-end; font-size:13px; color:var(--cb-faint); white-space:nowrap; }
+  /* grade de cartões */
+  html[data-ui="cubo"] #cuboGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(258px,1fr)); gap:14px; }
+  html[data-ui="cubo"] .cubocard { background:var(--cb-surface); border:1px solid var(--cb-border);
+    border-top:2px solid var(--gc); border-radius:14px; padding:15px; display:flex; flex-direction:column; gap:12px; cursor:pointer; }
+  html[data-ui="cubo"] .cubocard:hover { border-color:#2dd4a766; }
+  html[data-ui="cubo"] .cubocard:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  html[data-ui="cubo"] .cc-top { display:flex; align-items:flex-start; gap:11px; }
+  html[data-ui="cubo"] .cc-id { flex:1; min-width:0; }
+  html[data-ui="cubo"] .cc-name { font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  html[data-ui="cubo"] .cc-sub { display:flex; align-items:center; gap:6px; margin-top:4px; font-size:11.5px; }
+  html[data-ui="cubo"] .cc-rk { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex:0 0 auto; }
+  html[data-ui="cubo"] .cc-rank { font-size:10.5px; color:#6a7280; font-family:'IBM Plex Mono',monospace; }
+  html[data-ui="cubo"] .cc-metric { display:flex; align-items:flex-end; justify-content:space-between; }
+  html[data-ui="cubo"] .cc-big { font-family:'Space Grotesk',sans-serif; font-size:25px; font-weight:700; color:var(--accent); line-height:1; }
+  html[data-ui="cubo"] .cc-lbl { font-size:10.5px; margin-top:3px; }
+  html[data-ui="cubo"] .cc-foot { display:flex; justify-content:space-between; border-top:1px solid var(--cb-border-soft);
+    padding-top:10px; font-size:11.5px; color:var(--cb-faint); }
+  html[data-ui="cubo"] .cc-foot b { color:#cdd3dd; font-family:'IBM Plex Mono',monospace; }
+  html[data-ui="cubo"] .cubocard .trend, html[data-ui="cubo"] .cubohero .trend { font-size:12.5px; }
+  html[data-ui="cubo"] .cbempty { padding:34px; text-align:center; color:var(--cb-faint);
+    grid-column:1/-1; background:var(--cb-surface); border:1px solid var(--cb-border); border-radius:14px; }
+  html[data-ui="cubo"] .lock { font-size:11px; color:#e0a86a; }
+  @media (max-width:560px){
+    html[data-ui="cubo"] #cuboGrid { grid-template-columns:1fr; }
+    html[data-ui="cubo"] .cubohero { grid-template-columns:1fr; }
+    html[data-ui="cubo"] .ch-delta { align-self:flex-start; }
+  }
 </style></head>
 <body>
 <header>
@@ -1397,6 +1454,10 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
     <button id="clear" data-tip="limpa busca e todos os filtros">✕ Limpar</button>
   </div>
   <div class="group">
+    <div class="seg cubo-only" id="cuboModeSeg" role="group" aria-label="visualização"
+        data-tip="alternar entre cartões e tabela (só no layout Cubo)">
+      <button type="button" data-m="cards">▦ Cartões</button><button type="button" data-m="table">▤ Tabela</button>
+    </div>
     <div class="seg" id="cur" role="group" aria-label="moeda">
       <button data-c="usd">USD $</button><button data-c="brl" class="on">BRL R$</button>
     </div>
@@ -1410,6 +1471,10 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
 </div>
 <div id="activeFilters" aria-label="filtros ativos"></div>
 <div id="movers" aria-label="maiores variações de preço"></div>
+<div id="cuboView" aria-label="ranking em cartões (layout Cubo)">
+  <div id="cuboHero"></div>
+  <div id="cuboGrid"></div>
+</div>
 <div class="wrap">
 <table id="t"><thead><tr>
   <th data-k="name" tabindex="0">Item</th>
@@ -1931,6 +1996,14 @@ function currentRows(){
 
 // ---- Aba de Efeitos (gemas/decorações) --------------------------------------------------
 let curView = "market";
+// Layout Cubo (Fase 2): no Mercado, alterna entre grade de CARTÕES e a TABELA atual.
+let cuboMode = "cards";
+try{ const m=localStorage.getItem("tbh_cubomode"); if(m==="cards"||m==="table") cuboMode=m; }catch(e){}
+function isCubo(){ return document.documentElement.getAttribute("data-ui")==="cubo"; }
+// liga/desliga a classe que faz o CSS mostrar os cartões e esconder a tabela (só Cubo+Mercado+cards)
+function syncCuboMode(){
+  document.body.classList.toggle("cubo-cards", isCubo() && curView==="market" && cuboMode==="cards");
+}
 function setView(v){
   curView = v;
   document.body.classList.toggle("view-effects", v==="effects");
@@ -1940,6 +2013,7 @@ function setView(v){
   for(const [id,name] of [["tabMarket","market"],["tabEffects","effects"],["tabFarm","farm"],["tabCraft","craft"],["tabBag","bag"]]){
     const on=v===name; $(id).classList.toggle("on", on); $(id).setAttribute("aria-selected", String(on)); }
   try{ localStorage.setItem("tbh_view", v); }catch(e){}
+  syncCuboMode();
   if(v==="effects") renderEffects(); else if(v==="farm") renderFarm();
   else if(v==="craft") renderCraft(); else if(v==="bag") renderBag(); else render();
 }
@@ -2175,6 +2249,76 @@ function renderPager(total, pages, off, shown){
   $("pgSize").onchange=e=>{ pageSize=+e.target.value; page=1; savePrefs(); render(); };
 }
 
+// ---- Layout Cubo: hero "melhor negócio" + grade de cartões (Fase 2) ---------------------
+function cuboAbbr(d){
+  const s=(d.gearType||d.type||d.name||"").replace(/[^A-Za-z]/g,"");
+  return (s.slice(0,3).toUpperCase()||"·");
+}
+function cuboTile(d, gc, lg){
+  return `<span class="cbtile${lg?' lg':''}" style="background:${gc}22;border-color:${gc}33;color:${gc}">${cuboAbbr(d)}</span>`;
+}
+function cuboSub(d, gc){
+  const t = d.gearType ? titleCase(d.gearType) : (d.type?titleCase(d.type):"");
+  return `<span class="cc-dot" style="background:${gc}"></span><span style="color:${gc}">${esc(d.grade||"—")}</span>`
+       + `<span class="cc-mut"> · ${esc(t||"—")}${d.level!=null?" · lvl "+d.level:""}</span>`;
+}
+function cuboPrice(d){
+  if(d.gradeLock===true) return '<span class="lock">intradável</span>';
+  return d.priceEst!=null ? sym()+d.priceEst.toFixed(2) : "—";
+}
+function cuboHeroHtml(d, gc){
+  return `<div class="cubohero" data-name="${esc(d.name)}" tabindex="0" role="button"
+      aria-label="melhor negócio: ${esc(d.name)}" style="--gc:${gc}">
+    <div class="ch-main">
+      <div class="ch-badges"><span class="ch-top">★ TOP</span><span class="ch-deal">Melhor negócio agora</span></div>
+      <div class="ch-id">${cuboTile(d,gc,true)}<div style="min-width:0">
+        <div class="ch-name">${esc(d.name)}</div>
+        <div class="ch-sub">${cuboSub(d,gc)}</div></div></div>
+      <div class="ch-nums">
+        <div><div class="ch-big accent">${d.goldPerEst!=null?fmtAbbr(d.goldPerEst):"—"}</div><div class="cc-lbl">gold por ${sym().trim()}</div></div>
+        <div class="ch-sep"><div class="ch-big">${fmtAbbr(d.gold)}</div><div class="cc-lbl">gold no cubo · ${cuboPrice(d)}</div></div>
+      </div>
+    </div>
+    <div class="ch-delta">${trendCell(d)} · 24h</div>
+  </div>`;
+}
+function cuboCardHtml(d, gc, rank){
+  const liq = liqClass(liqScore(d.listings, d.vol));
+  return `<div class="cubocard" data-name="${esc(d.name)}" tabindex="0" role="button"
+      aria-label="${esc(d.name)}" style="--gc:${gc}">
+    <div class="cc-top">${cuboTile(d,gc)}
+      <div class="cc-id"><div class="cc-name" style="color:${gc}">${highlightName(d.name)}</div>
+        <div class="cc-sub">${cuboSub(d,gc)}</div></div>
+      <div class="cc-rk"><span class="cc-rank">#${rank}</span><span class="liq ${liq}" title="liquidez"></span></div>
+    </div>
+    <div class="cc-metric">
+      <div><div class="cc-big">${d.goldPerEst!=null?fmtAbbr(d.goldPerEst):"—"}</div><div class="cc-lbl">gold / ${sym().trim()}</div></div>
+      <div>${trendCell(d)}</div>
+    </div>
+    <div class="cc-foot"><span>Gold <b data-tip="${fmt(d.gold)} gold">${fmtAbbr(d.gold)}</b></span><span>Preço <b>${cuboPrice(d)}</b></span></div>
+  </div>`;
+}
+function renderCuboCards(rows, maxPpr, dealCut){
+  const hero=$("cuboHero"), grid=$("cuboGrid");
+  if(!rows.length){
+    hero.innerHTML="";
+    grid.innerHTML=`<div class="cbempty">Nenhum item corresponde aos filtros.
+      <button id="clearEmpty" style="margin-left:8px">✕ Limpar filtros</button></div>`;
+    const cb=$("clearEmpty"); if(cb) cb.onclick=clearFilters;
+    if($("pager")) $("pager").innerHTML="";
+    return;
+  }
+  const pages=Math.max(1, Math.ceil(rows.length/pageSize));
+  if(page>pages) page=pages;
+  const off=(page-1)*pageSize, pageRows=rows.slice(off, off+pageSize);
+  renderPager(rows.length, pages, off, pageRows.length);
+  // hero = líder da ordenação/filtro atuais (só na 1ª página); cartões = o restante da página
+  if(page===1 && pageRows.length){
+    hero.innerHTML=cuboHeroHtml(pageRows[0], GRADE_COLORS[pageRows[0].grade]||"#9aa3b8");
+  } else hero.innerHTML="";
+  const cards=(page===1)?pageRows.slice(1):pageRows;
+  grid.innerHTML=cards.map((d,i)=>cuboCardHtml(d, GRADE_COLORS[d.grade]||"#9aa3b8", off+(page===1?2:1)+i)).join("");
+}
 function render(){
   const rows = currentRows();
   renderMovers();
@@ -2193,6 +2337,11 @@ function render(){
   updateEnrichBtn(rows);
   const dealCut = med * 2;   // arbitragem: gold/moeda >= 2× a mediana do filtro = ótimo negócio
   const acols = selAttrList();   // colunas de atributo visíveis nesta render
+
+  // Layout Cubo (cartões): reusa rows/baseline/movers já computados; a tabela fica escondida.
+  if(isCubo() && curView==="market" && cuboMode!=="table"){
+    renderCuboCards(rows, maxPpr, dealCut); markSort(); return;
+  }
 
   if(!rows.length){
     tbody.innerHTML = `<tr><td class="empty" colspan="${colCount()}">
@@ -2373,6 +2522,8 @@ function setUI(v){
        if(v==="atual") u.searchParams.delete("ui"); else u.searchParams.set("ui", v);
        history.replaceState(null, "", u); }catch(e){}
   document.querySelectorAll("#uiSwitch button").forEach(b=>b.classList.toggle("on", b.dataset.ui===v));
+  syncCuboMode();
+  if(curView==="market") render();   // re-renderiza Mercado como cartões/tabela conforme o layout
 }
 (function initUISwitch(){
   const cur = document.documentElement.getAttribute("data-ui") || "atual";
@@ -2380,6 +2531,29 @@ function setUI(v){
     b.classList.toggle("on", b.dataset.ui===cur);
     b.onclick = ()=>setUI(b.dataset.ui);
   });
+})();
+// toggle Cartões/Tabela (só aparece no Cubo)
+function setCuboMode(m){
+  cuboMode = (m==="table") ? "table" : "cards";
+  try{ localStorage.setItem("tbh_cubomode", cuboMode); }catch(e){}
+  document.querySelectorAll("#cuboModeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===cuboMode));
+  syncCuboMode();
+  if(curView==="market") render();
+}
+(function initCuboMode(){
+  document.querySelectorAll("#cuboModeSeg button").forEach(b=>{
+    b.classList.toggle("on", b.dataset.m===cuboMode);
+    b.onclick = ()=>setCuboMode(b.dataset.m);
+  });
+  syncCuboMode();
+})();
+// abrir detalhe ao clicar/Enter num cartão ou no hero (reusa openDetail com o item cru de DATA)
+(function wireCuboClicks(){
+  const view=$("cuboView"); if(!view) return;
+  const open = el => { const raw = el && DATA.find(x=>x.name===el.dataset.name); if(raw) openDetail(raw); };
+  view.addEventListener("click", e=>{ const el=e.target.closest("[data-name]"); if(el) open(el); });
+  view.addEventListener("keydown", e=>{ if(e.key!=="Enter"&&e.key!==" ") return;
+    const el=e.target.closest("[data-name]"); if(el){ e.preventDefault(); open(el); } });
 })();
 ["eq","eSlot","eStat","eSort"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="effects") renderEffects(); }));
 ["fq","fAct","fSort","fTrad"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="farm") renderFarm(); }));

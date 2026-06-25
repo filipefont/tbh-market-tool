@@ -5,7 +5,9 @@ title TBH Market Tool - servidor
 echo Iniciando o servidor local... (o navegador abre sozinho em alguns segundos)
 echo Para parar, feche esta janela ou pressione Ctrl+C.
 echo.
-wsl -e bash -c "cd '/mnt/c/Users/filip/Downloads/PROJETO TBH TASK BAR HERO/tbh-market-tool' && python3 build.py serve"
+REM abre o navegador em ~3s (o servidor sobe na sequencia e atende na porta 8765)
+start "" cmd /c "timeout /t 3 >nul & start http://localhost:8765/"
+wsl -e bash -c "cd '/mnt/c/Users/filip/OneDrive/Documentos/GitHub/tbh-market-tool' && python3 build.py serve"
 echo.
 echo Servidor encerrado.
 pause

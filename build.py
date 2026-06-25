@@ -572,6 +572,27 @@ def merge_orderbook(updates):
     return book
 
 
+def merge_orderbook_partials(pattern):
+    """Consolida os parciais dos shards (--orderbook-out) em orderbook.json + order_history.
+    Job de merge do CI: roda DEPOIS dos runners paralelos, é o único que escreve no cache/histórico
+    compartilhado (os shards só geram JSONs parciais), então não há corrida de escrita."""
+    import glob
+    files = sorted(glob.glob(pattern))
+    combined = {}
+    for fp in files:
+        try:
+            part = json.load(open(fp, encoding="utf-8"))
+        except (ValueError, OSError) as e:
+            print(f"  ! parcial inválido ignorado {fp}: {e}")
+            continue
+        for name, bycur in (part or {}).items():
+            combined.setdefault(name, {}).update(bycur)
+        print(f"  + {fp}: {len(part or {})} itens")
+    if combined:
+        merge_orderbook(combined)   # atualiza orderbook.json (sob lock) + record_order_history
+    print(f"[merge] {len(combined)} itens consolidados de {len(files)} parciais")
+
+
 def is_book_fresh(name, ttl, book=None):
     """True se o order book do item foi buscado há menos de `ttl` s (em qualquer moeda)."""
     book = load_orderbook() if book is None else book
@@ -2960,7 +2981,7 @@ def _spread_pct(bk):
 ORDERBOOK_FLUSH_EVERY = 20  # salva o cache a cada N coletas (resiliência a timeout/crash do CI)
 
 
-def enrich_orderbook(rows, top_n):
+def enrich_orderbook(rows, top_n, shards=1, shard=0, out_path=None):
     """Coleta as encomendas (buy orders) dos itens. `top_n <= 0` coleta TODOS os candidatos.
     Respeita o TTL p/ não remartelar e o throttle global da Steam.
 
@@ -2971,15 +2992,28 @@ def enrich_orderbook(rows, top_n):
     Ordena por VALOR (gold) desc — assim os itens caros (onde estão as maiores encomendas) são
     coletados primeiro e não ficam famintos se o passo estourar o tempo no CI.
 
-    Salva o cache incrementalmente (a cada ORDERBOOK_FLUSH_EVERY itens): uma coleta longa pode
-    estourar o timeout do passo do CI; sem flush, todo o progresso se perderia."""
+    SHARDING (paralelismo no CI): com `shards > 1`, cada runner processa só a fatia
+    `candidates[shard::shards]` (stride). O corte por passada (e não por bloco contíguo) distribui
+    itens caros e baratos por igual entre os shards -> tempos de execução equilibrados. Como cada
+    runner tem IP próprio, os shards rodam em paralelo sem brigar pelo mesmo limite de taxa da Steam.
+
+    `out_path` (modo shard): grava a coleta deste runner como um PARCIAL em JSON ({name:{cur:bk}}) e
+    NÃO toca o cache/histórico compartilhado — quem consolida é `--merge-orderbook` no job de merge,
+    evitando corrida de escrita em orderbook.json/history.db entre runners paralelos.
+
+    Sem `out_path`, salva o cache incrementalmente (a cada ORDERBOOK_FLUSH_EVERY itens): uma coleta
+    longa pode estourar o timeout do passo do CI; sem flush, todo o progresso se perderia."""
     book = load_orderbook()
     candidates = sorted((r for r in rows if r.get("tradable") and not r.get("gradeLock")),
                         key=lambda r: r.get("gold") or 0, reverse=True)
+    if shards > 1:
+        candidates = candidates[shard::shards]   # fatia deste runner (stride: caros/baratos juntos)
     limit = len(candidates) if top_n <= 0 else top_n
+    collected = {}         # parcial deste shard (vai p/ out_path; não mexe no cache compartilhado)
     pending, done = {}, 0  # `pending`: coletas ainda não persistidas (zera a cada flush)
     alvo = "todos" if top_n <= 0 else str(limit)
-    print(f"\n[orderbook] encomendas dos {alvo} itens (tradáveis, por valor)...")
+    escopo = f" [shard {shard + 1}/{shards}]" if shards > 1 else ""
+    print(f"\n[orderbook] encomendas dos {alvo} itens (tradáveis, por valor){escopo}...")
 
     def flush():
         if pending:
@@ -3003,16 +3037,25 @@ def enrich_orderbook(rows, top_n):
             continue
         book.setdefault(r["name"], {})[curkey] = bk
         pending.setdefault(r["name"], {})[curkey] = bk
+        collected.setdefault(r["name"], {})[curkey] = bk
         r["book"] = book[r["name"]]
         sp = _spread_pct(bk)
         bm = f"{bk['buyMax']:.2f}" if bk['buyMax'] is not None else "—"
         print(f"  + {r['name']}: maior enc {bm} {curkey.upper()} · "
               f"{bk['buyOrders']} enc · spread {sp if sp is not None else '—'}%")
         done += 1
-        if done % ORDERBOOK_FLUSH_EVERY == 0:
+        if not out_path and done % ORDERBOOK_FLUSH_EVERY == 0:
             flush()
-    flush()
-    print(f"[orderbook] {done} itens com encomenda coletados")
+    if out_path:
+        os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+        tmp = out_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(collected, f, ensure_ascii=False)
+        os.replace(tmp, out_path)
+        print(f"[orderbook] shard {shard + 1}/{shards}: {done} itens -> {out_path}")
+    else:
+        flush()
+        print(f"[orderbook] {done} itens com encomenda coletados")
 
 
 def cmd_book(names):
@@ -3561,6 +3604,14 @@ def main():
                     help="moeda das consultas precisas (price/enrich)")
     ap.add_argument("--orderbook-top", type=int, default=None, metavar="N",
                     help="coleta as encomendas (buy orders) dos N itens mais líquidos (0 = todos)")
+    ap.add_argument("--orderbook-shards", type=int, default=1, metavar="N",
+                    help="divide a varredura de encomendas em N fatias (paralelismo no CI)")
+    ap.add_argument("--orderbook-shard", type=int, default=0, metavar="I",
+                    help="índice da fatia (0..N-1) a processar quando --orderbook-shards > 1")
+    ap.add_argument("--orderbook-out", default=None, metavar="PATH",
+                    help="grava a coleta do shard num JSON parcial (não toca o cache compartilhado)")
+    ap.add_argument("--merge-orderbook", default=None, metavar="GLOB",
+                    help="consolida os parciais dos shards (ex.: 'shards/*.json') no cache + histórico")
     sub = ap.add_subparsers(dest="cmd")
     p = sub.add_parser("price", help="consulta PRECISA de 1+ itens (sob demanda)")
     p.add_argument("names", nargs="+")
@@ -3572,6 +3623,11 @@ def main():
 
     init_history()                 # garante a tabela antes de qualquer comando
     seed_history_from_enriched()   # backfill único (no-op se já populado)
+
+    # job de merge do CI: consolida os parciais dos shards no orderbook.json ANTES do build_rows
+    # (que lê o cache p/ anexar `book` às linhas) -> o site sai com as encomendas de todos os shards.
+    if args.merge_orderbook:
+        merge_orderbook_partials(args.merge_orderbook)
 
     if args.cmd == "price":
         cmd_price(args.names, args.currency)
@@ -3601,7 +3657,10 @@ def main():
     if args.enrich_top:
         enrich(rows, args.enrich_top, args.currency)
     if args.orderbook_top is not None:
-        enrich_orderbook(rows, args.orderbook_top)
+        enrich_orderbook(rows, args.orderbook_top, args.orderbook_shards,
+                         args.orderbook_shard, args.orderbook_out)
+        if args.orderbook_out:
+            return  # shard: só coleta e grava o parcial; a consolidação/build é no job de merge
     mark_new_items(rows)             # selo "NOVO" p/ itens listados a partir da reabertura
     attach_game_extras(rows, items, args.refresh)  # efeitos das gemas + locais de drop (farm)
     report_join_health(rows, unmatched, steam, args.public)  # saúde da junção + alerta (CI summary)

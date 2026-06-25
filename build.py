@@ -1034,11 +1034,25 @@ HTML_TEMPLATE = r"""<!doctype html>
          padding:7px 14px; border-radius:8px 8px 0 0; cursor:pointer; font-size:13px; }
   .tab.on { color:#e8ebf2; background:#ffffff0d; border-color:#ffffff1f; font-weight:600;
             box-shadow:inset 0 -2px 0 var(--accent); }
-  /* alternância de view: por padrão mostra o Mercado; .view-effects troca p/ a aba de Efeitos */
-  #effectsView { display:none; }
-  body.view-effects #effectsView { display:block; }
-  body.view-effects #marketControls, body.view-effects #activeFilters,
-  body.view-effects #movers, body.view-effects .wrap { display:none; }
+  /* alternância de view: por padrão mostra o Mercado; .view-effects / .view-farm trocam de aba */
+  #effectsView, #farmView { display:none; }
+  body.view-effects #effectsView, body.view-farm #farmView { display:block; }
+  body.view-effects #marketControls, body.view-effects #activeFilters, body.view-effects #movers, body.view-effects .wrap,
+  body.view-farm #marketControls, body.view-farm #activeFilters, body.view-farm #movers, body.view-farm .wrap { display:none; }
+  /* cards de stage (farm) */
+  #farmGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px; padding:6px 20px 24px; }
+  .stagecard { border:1px solid #ffffff14; background:#ffffff07; border-radius:10px; padding:10px 12px; }
+  .stagecard .sh { display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
+  .stagecard .slabel { font-weight:700; color:var(--accent); }
+  .stagecard .sname { color:#cdd3e0; }
+  .stagecard .sboss { margin-left:auto; font-size:11px; color:#9aa3b8; }
+  .stagedrop { display:flex; align-items:center; gap:6px; font-size:12px; padding:3px 0; border-top:1px solid #ffffff0a; }
+  .stagedrop.trad { cursor:pointer; }
+  .stagedrop.trad:hover { background:#ffffff0e; }
+  .stagedrop .dn { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .stagedrop .dr { margin-left:auto; color:#9aa3b8; white-space:nowrap; }
+  .stagedrop .dp { color:var(--accent); white-space:nowrap; font-family:var(--font-mono); }
+  .stagecard .icon.sm { width:18px; height:18px; }
   /* grade de gemas */
   #effectsGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; padding:6px 20px 24px; }
   .gemcard { border:1px solid #ffffff14; background:#ffffff07; border-radius:10px; padding:10px 12px; cursor:pointer; }
@@ -1202,6 +1216,7 @@ HTML_TEMPLATE = r"""<!doctype html>
 <nav class="tabs" role="tablist" aria-label="seções">
   <button id="tabMarket" class="tab on" role="tab" aria-selected="true" data-tip="ranking de itens × mercado">Mercado</button>
   <button id="tabEffects" class="tab" role="tab" aria-selected="false" data-tip="gemas/decorações: efeito por slot + preço">Efeitos (gemas)</button>
+  <button id="tabFarm" class="tab" role="tab" aria-selected="false" data-tip="stages: onde dropam os itens (+ preço quando tradável)">Farm</button>
 </nav>
 <div class="controls" id="marketControls">
   <div class="group">
@@ -1278,6 +1293,17 @@ HTML_TEMPLATE = r"""<!doctype html>
     </div>
   </div>
   <div id="effectsGrid"></div>
+</section>
+<section id="farmView" aria-label="stages / farm">
+  <div class="controls">
+    <div class="group">
+      <input type="text" id="fq" placeholder="buscar stage ou item..." aria-label="buscar stage ou item dropado">
+      <select id="fAct" aria-label="filtrar por ato"><option value="">ato: todos</option></select>
+      <label class="meta"><input type="checkbox" id="fTrad"> só com drop tradável</label>
+      <span class="chip" id="fCount"></span>
+    </div>
+  </div>
+  <div id="farmGrid"></div>
 </section>
 <div id="toasts"></div>
 <div id="detailOverlay"></div>
@@ -1704,10 +1730,11 @@ let curView = "market";
 function setView(v){
   curView = v;
   document.body.classList.toggle("view-effects", v==="effects");
-  for(const [id,on] of [["tabMarket",v==="market"],["tabEffects",v==="effects"]]){
-    $(id).classList.toggle("on", on); $(id).setAttribute("aria-selected", String(on)); }
+  document.body.classList.toggle("view-farm", v==="farm");
+  for(const [id,name] of [["tabMarket","market"],["tabEffects","effects"],["tabFarm","farm"]]){
+    const on=v===name; $(id).classList.toggle("on", on); $(id).setAttribute("aria-selected", String(on)); }
   try{ localStorage.setItem("tbh_view", v); }catch(e){}
-  if(v==="effects") renderEffects(); else render();
+  if(v==="effects") renderEffects(); else if(v==="farm") renderFarm(); else render();
 }
 function gemRows(){ return DATA.filter(d=>d.effects && d.effects.length); }
 function populateEffectFilters(){
@@ -1747,6 +1774,51 @@ function gemCard(d){
   return `<div class="gemcard" data-name="${esc(d.name)}" tabindex="0" title="ver detalhes">
     <div class="gh">${icon}<span class="gname" style="color:${gc}">${esc(d.name)}</span><span class="gprice">${price}</span></div>
     ${effs}${net}</div>`;
+}
+
+// ---- Aba Farm (stages) -----------------------------------------------------------------
+let STAGES = null;
+async function ensureStages(){
+  if(STAGES===null){
+    try{ STAGES = await (await fetch("api/stages.json",{cache:"no-cache"})).json(); }
+    catch(e){ STAGES = []; }
+    populateFarmFilters();
+  }
+  return STAGES;
+}
+function populateFarmFilters(){
+  if($("fAct").options.length>1 || !STAGES || !STAGES.length) return;
+  const acts=[...new Set(STAGES.map(s=>s.act).filter(a=>a!=null))].sort((a,b)=>a-b);
+  $("fAct").insertAdjacentHTML("beforeend", acts.map(a=>`<option value="${a}">Ato ${a}</option>`).join(""));
+}
+async function renderFarm(){
+  const box=$("farmGrid"); if(!box) return;
+  box.innerHTML = `<div class="meta" style="padding:20px">carregando…</div>`;
+  await ensureStages();
+  const byName = new Map(DATA.map(d=>[d.name, d]));   // cruza o drop com o item de mercado
+  const q=$("fq").value.toLowerCase(), act=$("fAct").value, onlyTrad=$("fTrad").checked;
+  const stages = STAGES.filter(s=>{
+    if(act && String(s.act)!==act) return false;
+    if(onlyTrad && !(s.drops||[]).some(d=>byName.has(d.name))) return false;
+    if(q){ const hay=((s.label||"")+" "+(s.name||"")+" "+(s.drops||[]).map(d=>d.name).join(" ")).toLowerCase();
+           if(!hay.includes(q)) return false; }
+    return true;
+  });
+  $("fCount").textContent = `${stages.length} stages`;
+  box.innerHTML = stages.map(s=>stageCard(s, byName)).join("") || `<div class="meta" style="padding:20px">Nenhum stage corresponde.</div>`;
+  box.querySelectorAll(".stagedrop.trad").forEach(el=> el.onclick=()=>{ const d=DATA.find(x=>x.name===el.dataset.name); if(d) openDetail(d); });
+}
+function stageCard(s, byName){
+  const drops=(s.drops||[]).map(d=>{
+    const row=byName.get(d.name), gc=GRADE_COLORS[d.grade]||"#9aa3b8";
+    const icon=d.icon?`<img class="icon sm" src="${ICON_BASE}${encodeURIComponent(d.icon)}.png" alt="" loading="lazy" onerror="this.classList.add('noimg');this.removeAttribute('src')">`:`<span class="icon sm noimg"></span>`;
+    const price = row ? derive(row).priceEst : null;
+    const pTag = price!=null ? `<span class="dp">${sym()}${price.toFixed(2)}</span>` : "";
+    return `<div class="stagedrop${row?' trad':''}"${row?` data-name="${esc(d.name)}" title="ver ${esc(d.name)}"`:""}>${icon}<span class="dn" style="color:${gc}">${esc(d.name)}</span>${pTag}<span class="dr">taxa ${esc(String(d.rate??"—"))}</span></div>`;
+  }).join("");
+  return `<div class="stagecard">
+    <div class="sh"><span class="slabel">${esc(s.label||"?")}</span>${s.level!=null?`<span class="meta">Lv ${s.level}</span>`:""}<span class="sname">${esc(s.name||"")}</span>${s.boss?`<span class="sboss">boss: ${esc(s.boss)}</span>`:""}</div>
+    ${drops||'<div class="meta">sem drops</div>'}</div>`;
 }
 
 // Top movers: maiores altas/quedas de preço. Usa "desde a reabertura" (chgReopen) quando há dado;
@@ -1942,9 +2014,13 @@ $("avail").addEventListener("input", rerender);
 // abas (Mercado / Efeitos) + filtros da aba de Efeitos
 $("tabMarket").onclick = ()=>setView("market");
 $("tabEffects").onclick = ()=>setView("effects");
+$("tabFarm").onclick = ()=>setView("farm");
 ["eq","eSlot","eStat","eSort"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="effects") renderEffects(); }));
+["fq","fAct","fTrad"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="farm") renderFarm(); }));
 populateEffectFilters();
-try{ if(localStorage.getItem("tbh_view")==="effects" && gemRows().length) setView("effects"); }catch(e){}
+try{ const sv=localStorage.getItem("tbh_view");
+  if(sv==="effects" && gemRows().length) setView("effects");
+  else if(sv==="farm") setView("farm"); }catch(e){}
 $("rate").addEventListener("input", ()=>{ rate=parseFloat($("rate").value)||rate; rerenderDebounced(); });
 $("clear").onclick = clearFilters;
 $("favFilter").onclick = ()=>{
@@ -2731,6 +2807,23 @@ def _history_feed():
     return {n: pts[-HISTORY_FEED_MAX:] for n, pts in feed.items() if len(pts) >= 2}
 
 
+def _stages_feed():
+    """Stages (farm) compactos p/ o site público: só o necessário p/ os cards + cruzamento com
+    o mercado por nome do drop. Best-effort (vazio se faltar o cache)."""
+    out = []
+    for s in get_stages(False):
+        out.append({
+            "label": s.get("label"), "act": s.get("act"), "no": s.get("stageNo"),
+            "level": s.get("level"), "name": s.get("name"),
+            "type": s.get("type"), "difficulty": s.get("difficulty"),
+            "boss": (s.get("boss") or {}).get("name"),
+            "drops": [{"name": d.get("name"), "icon": d.get("icon"), "grade": d.get("grade"),
+                       "rate": d.get("rate"), "source": d.get("source")}
+                      for d in (s.get("drops") or [])],
+        })
+    return out
+
+
 def write_static(rows, brl_rate, public=False):
     rows.sort(key=lambda r: r["gold"] / r["usd"] if r["usd"] else 0, reverse=True)
     write_assets()                       # assets/styles.css + assets/app.js (cacheáveis)
@@ -2741,9 +2834,11 @@ def write_static(rows, brl_rate, public=False):
             json.dump(rows, f, ensure_ascii=False)
         with open(os.path.join(api_dir, "history.json"), "w", encoding="utf-8") as f:
             json.dump(_history_feed(), f, ensure_ascii=False)
+        with open(os.path.join(api_dir, "stages.json"), "w", encoding="utf-8") as f:
+            json.dump(_stages_feed(), f, ensure_ascii=False)
     out = os.path.join(HERE, "index.html")
     open(out, "w", encoding="utf-8").write(render_html(rows, brl_rate, public=public))
-    extra = " + api/{data,history}.json (público)" if public else ""
+    extra = " + api/{data,history,stages}.json (público)" if public else ""
     print(f"[ok] gerado: {out} + assets/{{styles.css,app.js}}{extra}")
 
 

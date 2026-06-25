@@ -3980,8 +3980,12 @@ def run_server(brl_rate, port):
                 self._send(200, APP_JS, "application/javascript")
             elif u.path == "/assets/styles.css":
                 self._send(200, CSS_CONTENT, "text/css")
-            elif u.path == "/api/history.json":        # feed estático do histórico (sem auth) p/ os sparklines do Cubo
+            elif u.path == "/api/history.json":        # feeds estáticos (sem auth) — espelham o build público
                 self._send(200, _history_feed())
+            elif u.path == "/api/craft.json":
+                self._send(200, _craft_feed(rows_cache["rows"]))
+            elif u.path == "/api/stages.json":
+                self._send(200, _stages_feed(rows_cache["rows"]))
             elif u.path == "/api/ping":
                 if self._auth():
                     self._send(200, {"ok": True})

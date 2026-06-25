@@ -1401,6 +1401,16 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
   html[data-ui="cubo"] .cbempty { padding:34px; text-align:center; color:var(--cb-faint);
     grid-column:1/-1; background:var(--cb-surface); border:1px solid var(--cb-border); border-radius:14px; }
   html[data-ui="cubo"] .lock { font-size:11px; color:#e0a86a; }
+  /* mini-sparkline (Fase 3) */
+  html[data-ui="cubo"] .cc-spark { display:inline-block; }
+  html[data-ui="cubo"] .cbspark { width:72px; height:24px; display:block; }
+  html[data-ui="cubo"] .ch-spark .cbspark { width:180px; height:60px; }
+  html[data-ui="cubo"] .cc-metric .cc-right { display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+  html[data-ui="cubo"] .ch-spark { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  /* respeita "reduzir movimento": desliga pulsos/flutuações (o count-up é tratado no JS) */
+  @media (prefers-reduced-motion: reduce){
+    .dot, [style*="animation"] { animation:none !important; }
+  }
   @media (max-width:560px){
     html[data-ui="cubo"] #cuboGrid { grid-template-columns:1fr; }
     html[data-ui="cubo"] .cubohero { grid-template-columns:1fr; }
@@ -2321,6 +2331,33 @@ function cuboPrice(d){
   if(d.gradeLock===true) return '<span class="lock">intradável</span>';
   return d.priceEst!=null ? sym()+d.priceEst.toFixed(2) : "—";
 }
+// Fase 3 — sparklines (de HIST/api/history.json), count-up e respeito a "reduzir movimento"
+function deltaColor(d){ const c=d.chg24; return c>0?"#3fbf7f":(c<0?"#ef6b6b":"#8a93a6"); }
+function cuboSparkSvg(name, color){
+  const s = HIST && HIST[name]; if(!s || s.length<2) return "";
+  const vs = s.map(p=>p[1]).filter(v=>v!=null); if(vs.length<2) return "";
+  const W=64,H=20, lo=Math.min(...vs), hi=Math.max(...vs), rng=(hi-lo)||1;
+  const pts = vs.map((v,i)=>{ const x=(i/(vs.length-1))*W;
+    const y=Math.max(1,Math.min(H-1, H-((v-lo)/rng)*H)); return x.toFixed(1)+","+y.toFixed(1); }).join(" ");
+  return `<svg class="cbspark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
+}
+// preenche os placeholders .cc-spark depois que o feed de histórico chega (1 fetch, cacheado)
+function injectCuboSparks(){
+  document.querySelectorAll("#cuboView .cc-spark").forEach(el=>{
+    if(el.dataset.done) return;
+    el.innerHTML = cuboSparkSvg(el.dataset.name, el.dataset.color||"#8a93a6");
+    el.dataset.done = "1";
+  });
+}
+const REDUCE_MOTION = (()=>{ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){ return false; } })();
+function countUp(el, target){
+  if(REDUCE_MOTION || !el){ if(el) el.textContent=fmt(Math.round(target)); return; }
+  const dur=900, t0=performance.now();
+  function step(t){ let p=Math.min(1,(t-t0)/dur); p=1-Math.pow(1-p,3);
+    el.textContent=fmt(Math.round(target*p)); if(p<1) requestAnimationFrame(step); }
+  requestAnimationFrame(step);
+}
+let cbStatAnimated=false;
 function cuboHeroHtml(d, gc){
   return `<div class="cubohero" data-name="${esc(d.name)}" tabindex="0" role="button"
       aria-label="melhor negócio: ${esc(d.name)}" style="--gc:${gc}">
@@ -2334,7 +2371,7 @@ function cuboHeroHtml(d, gc){
         <div class="ch-sep"><div class="ch-big">${fmtAbbr(d.gold)}</div><div class="cc-lbl">gold no cubo · ${cuboPrice(d)}</div></div>
       </div>
     </div>
-    <div class="ch-delta">${trendCell(d)} · 24h</div>
+    <div class="ch-spark"><span class="cc-spark" data-name="${esc(d.name)}" data-color="#2dd4a7"></span><span class="ch-delta">${trendCell(d)} · 24h</span></div>
   </div>`;
 }
 function cuboCardHtml(d, gc, rank){
@@ -2348,7 +2385,7 @@ function cuboCardHtml(d, gc, rank){
     </div>
     <div class="cc-metric">
       <div><div class="cc-big">${d.goldPerEst!=null?fmtAbbr(d.goldPerEst):"—"}</div><div class="cc-lbl">gold / ${sym().trim()}</div></div>
-      <div>${trendCell(d)}</div>
+      <div class="cc-right"><span class="cc-spark" data-name="${esc(d.name)}" data-color="${deltaColor(d)}"></span>${trendCell(d)}</div>
     </div>
     <div class="cc-foot"><span>Gold <b data-tip="${fmt(d.gold)} gold">${fmtAbbr(d.gold)}</b></span><span>Preço <b>${cuboPrice(d)}</b></span></div>
   </div>`;
@@ -2373,6 +2410,7 @@ function renderCuboCards(rows, maxPpr, dealCut){
   } else hero.innerHTML="";
   const cards=(page===1)?pageRows.slice(1):pageRows;
   grid.innerHTML=cards.map((d,i)=>cuboCardHtml(d, GRADE_COLORS[d.grade]||"#9aa3b8", off+(page===1?2:1)+i)).join("");
+  ensureHist().then(injectCuboSparks);   // mini-sparklines (1 fetch cacheado; preenche depois)
 }
 // ---- Sidebar do Cubo (Fase 2b): nav vertical, legenda de raridade, stat, realocação de filtros ----
 const CB_NAV = [["market","Ranking"],["effects","Efeitos"],["farm","Farm"],["craft","Craft"],["bag","🎒 Minha Mochila"]];
@@ -2397,6 +2435,7 @@ function updateCuboStat(visible){
   const el=$("cbStat"); if(!el) return;
   el.innerHTML = `<div class="k">Itens monitorados</div><div class="v">${fmt(DATA.length)}</div>`
     + `<div class="s">${visible!=null? fmt(visible)+" visíveis no filtro" : "mercado cruzado com a Steam"}</div>`;
+  if(!cbStatAnimated && DATA.length){ cbStatAnimated=true; countUp(el.querySelector(".v"), DATA.length); }
 }
 // move o GRUPO de filtros (busca + dropdowns + toggles) entre a barra do topo e a sidebar.
 // move o nó real (preserva os event listeners já fiados); idempotente.

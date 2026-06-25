@@ -2,19 +2,27 @@ name: Build & Publish
 
 # Gera o index.html PÚBLICO (somente leitura) e publica no GitHub Pages.
 # - a cada push na main
-# - a cada 2h (cron) para manter os preços frescos
+# - de hora em hora (cron) para manter os preços frescos
 # - manualmente (workflow_dispatch → botão "Run workflow")
 #
-# Os dados (cache do bulk + history.db) NÃO são commitados de volta no repo:
-# persistem entre execuções via actions/cache, evitando inchar o histórico do git.
+# PIPELINE EM 3 ETAPAS (paraleliza a coleta de encomendas p/ encurtar a janela de atualização):
+#   1) prepare   — rebaixa o bulk (preços/Δ) + enriquece o top-N; publica os "dados-base" p/ os shards
+#   2) orderbook — MATRIX de N runners, cada um varre uma fatia das encomendas (IPs distintos = limites
+#                  de taxa da Steam independentes -> roda em paralelo de verdade). Cada shard só grava
+#                  um JSON PARCIAL (não toca o cache compartilhado).
+#   3) finalize  — consolida os parciais (--merge-orderbook), gera o site e publica no Pages.
+# Antes era 1 job sequencial (~70min); agora ~20-25min de ponta a ponta. Pra mudar o nº de shards,
+# ajuste a matrix `shard:` E o --orderbook-shards (devem casar).
+#
+# Os dados (cache do bulk + history.db) NÃO são commitados de volta no repo: persistem entre
+# execuções via actions/cache (restore em `prepare`, save em `finalize`) e trafegam entre jobs da
+# MESMA run via artifact (`data-base`).
 on:
   push:
     branches: [main]
   schedule:
-    # JANELA DE REABERTURA (25/06/2026): cadência de 1h p/ capturar a formação de preço/encomenda
-    # nas primeiras 24–48h. É a cadência máxima ÚTIL: o passo de encomendas varre ~600 itens (~50min),
-    # então intervalos menores só empilham execuções (concurrency serializa). REVERTER p/ "0 */2 * * *"
-    # quando a volatilidade baixar. Ver .spec/roadmap-d25-reabertura.md (item 3).
+    # JANELA DE REABERTURA: cadência de 1h p/ capturar a formação de preço/encomenda.
+    # REVERTER p/ "0 */2 * * *" quando a volatilidade baixar. Ver .spec/roadmap-d25-reabertura.md.
     - cron: "0 * * * *"   # de hora em hora (TEMPORÁRIO — normal: 0 */2 * * *)
   workflow_dispatch:
 
@@ -29,10 +37,94 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  # ── 1) PREPARE: preços/Δ frescos (bulk + enrich) e empacota os dados-base p/ os shards ──────────
+  prepare:
     runs-on: ubuntu-latest
-    # 90min: a coleta de encomendas varre TODOS os itens (~5s/req, piso do throttle) -> ~50min.
-    timeout-minutes: 90
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # restore-only: o save do cache final é feito no job `finalize` (com os dados já consolidados).
+      # Se `prepare` salvasse aqui, ocuparia a chave data-${run_id} e o `finalize` não conseguiria
+      # gravar a versão com as encomendas -> a próxima run restauraria dados sem order book.
+      - name: Restaura dados (cache)
+        uses: actions/cache/restore@v4
+        with:
+          path: data
+          key: data-${{ github.run_id }}
+          restore-keys: |
+            data-
+
+      # rebaixa o bulk da Steam (best-effort): alimenta o price_history (USD) -> Δ24h/Δreabertura.
+      - name: Atualiza preços (best-effort)
+        continue-on-error: true
+        run: timeout 1200 python3 build.py --refresh
+
+      # preço REAL (priceoverview + Δ 24h) do top-N por gold/$ p/ o site não ficar só com estimativas.
+      - name: Enriquece top-N (best-effort)
+        continue-on-error: true
+        run: timeout 1200 python3 build.py --enrich-top 25 --currency brl
+
+      # dados-base (bulk + history.db + enriched + orderbook antigo p/ o TTL) p/ os shards e o finalize
+      # usarem EXATAMENTE o mesmo snapshot -> a lista de candidatos das encomendas é idêntica entre eles.
+      - name: Empacota dados-base
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-base
+          path: data
+          retention-days: 1
+
+  # ── 2) ORDERBOOK: matrix de shards — cada runner varre uma fatia (IP próprio = limite próprio) ───
+  orderbook:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false   # um shard que estoure não derruba os outros; o merge usa o que chegou
+      matrix:
+        shard: [0, 1, 2, 3]   # casar com --orderbook-shards abaixo
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Baixa dados-base
+        uses: actions/download-artifact@v4
+        with:
+          name: data-base
+          path: data
+
+      # varre só a fatia deste runner e grava um PARCIAL (não toca o cache/histórico compartilhado).
+      - name: Coleta encomendas (shard ${{ matrix.shard }})
+        continue-on-error: true
+        run: >
+          timeout 2000 python3 build.py --orderbook-top 0
+          --orderbook-shards 4 --orderbook-shard ${{ matrix.shard }}
+          --orderbook-out shards/ob-${{ matrix.shard }}.json
+
+      - name: Sobe o parcial do shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: ob-shard-${{ matrix.shard }}
+          path: shards/ob-${{ matrix.shard }}.json
+          retention-days: 1
+          if-no-files-found: warn   # shard sem nenhuma encomenda nova: ok, só não sobe parcial
+
+  # ── 3) FINALIZE: consolida os parciais, gera o site e publica no Pages ──────────────────────────
+  finalize:
+    needs: orderbook
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      # usa a URL da tentativa que deu certo (1ª ou retry)
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,39 +137,24 @@ jobs:
         with:
           node-version: "20"
 
-      # carrega os dados acumulados (cache do bulk + history.db) da execução anterior.
-      # chave rolante por run_id; restore-keys casa o cache mais recente com prefixo "data-".
-      - name: Restaura dados (cache)
-        uses: actions/cache@v4
+      - name: Baixa dados-base
+        uses: actions/download-artifact@v4
         with:
+          name: data-base
           path: data
-          key: data-${{ github.run_id }}
-          restore-keys: |
-            data-
 
-      # rebaixa o bulk da Steam (best-effort: se falhar/limitar, segue com o cache)
-      - name: Atualiza preços (best-effort)
-        continue-on-error: true
-        run: timeout 1200 python3 build.py --refresh
+      # junta todos os parciais ob-shard-* em ./shards (merge-multiple achata os artifacts num só dir)
+      - name: Baixa parciais dos shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ob-shard-*
+          path: shards
+          merge-multiple: true
 
-      # busca o preço REAL (priceoverview + mediana + Δ 24h) do top-N por gold/$,
-      # para o site público não ficar só com estimativas. Respeita o throttle da Steam.
-      - name: Enriquece top-N (best-effort)
-        continue-on-error: true
-        run: timeout 1200 python3 build.py --enrich-top 25 --currency brl
-
-      # coleta as ENCOMENDAS (buy orders) de TODOS os itens (--orderbook-top 0): maior encomenda
-      # + demanda, p/ o ranking "melhor p/ vender por $". Persistido em data/orderbook.json (vai
-      # p/ o cache) e gravado incrementalmente, então um timeout aqui não perde o que já coletou.
-      # NB: o runner é US -> o order book costuma vir em USD; o front-end converte pela taxa.
-      - name: Coleta encomendas (best-effort)
-        continue-on-error: true
-        run: timeout 4500 python3 build.py --orderbook-top 0
-
-      # gera o site PÚBLICO (somente leitura: sem botões de atualização pela web)
-      # roda por último p/ embutir os dados de preço e encomenda já coletados acima.
-      - name: Gera o site (público)
-        run: python3 build.py --public
+      # consolida os parciais no orderbook.json + order_history e gera o site PÚBLICO numa só passada
+      # (--merge-orderbook roda ANTES do build_rows, que lê o cache p/ anexar as encomendas às linhas).
+      - name: Consolida encomendas + gera o site (público)
+        run: python3 build.py --merge-orderbook 'shards/*.json' --public
 
       # valida a sintaxe do JS gerado — pega erro de runtime/sintaxe antes de publicar
       - name: Valida JS (node --check)
@@ -86,6 +163,14 @@ jobs:
       # rede de segurança: falha o deploy se o build regredir
       - name: Smoke test
         run: python3 tests/smoke.py
+
+      # save do cache com os dados JÁ consolidados (bulk + enrich + encomendas + histórico) p/ a
+      # próxima run restaurar via restore-keys "data-".
+      - name: Salva dados (cache)
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: data-${{ github.run_id }}
 
       - name: Prepara artefato do Pages
         run: |
@@ -107,14 +192,6 @@ jobs:
         with:
           path: _site
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      # usa a URL da tentativa que deu certo (1ª ou retry)
-      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
-    steps:
       # 1ª tentativa: o deploy do Pages às vezes fica preso em "deployment_queued" e estoura o
       # timeout (incidente transitório do GitHub). continue-on-error deixa o job seguir p/ o retry.
       - id: deployment
@@ -123,8 +200,7 @@ jobs:
       # respiro p/ a fila do Pages limpar antes de tentar de novo
       - if: steps.deployment.outcome == 'failure'
         run: sleep 60
-      # retry automático: uma nova tentativa costuma passar (foi o que o rerun manual confirmou).
-      # Sem continue-on-error: se o retry também falhar, o job falha e o GitHub notifica.
+      # retry automático: uma nova tentativa costuma passar.
       - id: deployment_retry
         if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4

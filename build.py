@@ -1046,6 +1046,10 @@ HTML_TEMPLATE = r"""<!doctype html>
   .stagecard .slabel { font-weight:700; color:var(--accent); }
   .stagecard .sname { color:#cdd3e0; }
   .stagecard .sboss { margin-left:auto; font-size:11px; color:#9aa3b8; }
+  .evchip { margin-left:auto; font-size:11px; font-weight:600; color:var(--accent-ink); background:var(--accent);
+            border-radius:6px; padding:1px 7px; cursor:help; font-family:var(--font-mono); white-space:nowrap; }
+  .evtops { font-size:11px; color:#8b93a7; margin-bottom:5px; }
+  .evtop { color:var(--accent); cursor:pointer; } .evtop:hover { text-decoration:underline; }
   .stagedrop { display:flex; align-items:center; gap:6px; font-size:12px; padding:3px 0; border-top:1px solid #ffffff0a; }
   .stagedrop.trad { cursor:pointer; }
   .stagedrop.trad:hover { background:#ffffff0e; }
@@ -1299,6 +1303,11 @@ HTML_TEMPLATE = r"""<!doctype html>
     <div class="group">
       <input type="text" id="fq" placeholder="buscar stage ou item..." aria-label="buscar stage ou item dropado">
       <select id="fAct" aria-label="filtrar por ato"><option value="">ato: todos</option></select>
+      <select id="fSort" aria-label="ordenar stages">
+        <option value="ev">maior valor/caixa</option>
+        <option value="label">stage (1-1, 1-2…)</option>
+        <option value="level">nível</option>
+      </select>
       <label class="meta"><input type="checkbox" id="fTrad"> só com drop tradável</label>
       <span class="chip" id="fCount"></span>
     </div>
@@ -1796,19 +1805,24 @@ async function renderFarm(){
   box.innerHTML = `<div class="meta" style="padding:20px">carregando…</div>`;
   await ensureStages();
   const byName = new Map(DATA.map(d=>[d.name, d]));   // cruza o drop com o item de mercado
-  const q=$("fq").value.toLowerCase(), act=$("fAct").value, onlyTrad=$("fTrad").checked;
-  const stages = STAGES.filter(s=>{
+  const q=$("fq").value.toLowerCase(), act=$("fAct").value, onlyTrad=$("fTrad").checked, sortBy=$("fSort").value;
+  let stages = STAGES.filter(s=>{
     if(act && String(s.act)!==act) return false;
     if(onlyTrad && !(s.drops||[]).some(d=>byName.has(d.name))) return false;
     if(q){ const hay=((s.label||"")+" "+(s.name||"")+" "+(s.drops||[]).map(d=>d.name).join(" ")).toLowerCase();
            if(!hay.includes(q)) return false; }
     return true;
   });
+  const fx = cur==="brl" ? (rate>0?rate:1) : 1;   // EV vem em USD -> moeda atual
+  stages = stages.slice().sort((a,b)=>
+    sortBy==="label" ? (a.label||"").localeCompare(b.label||"", undefined, {numeric:true})
+    : sortBy==="level" ? (a.level??0)-(b.level??0)
+    : (b.ev||0)-(a.ev||0));   // ev: maior primeiro
   $("fCount").textContent = `${stages.length} stages`;
-  box.innerHTML = stages.map(s=>stageCard(s, byName)).join("") || `<div class="meta" style="padding:20px">Nenhum stage corresponde.</div>`;
-  box.querySelectorAll(".stagedrop.trad").forEach(el=> el.onclick=()=>{ const d=DATA.find(x=>x.name===el.dataset.name); if(d) openDetail(d); });
+  box.innerHTML = stages.map(s=>stageCard(s, byName, fx)).join("") || `<div class="meta" style="padding:20px">Nenhum stage corresponde.</div>`;
+  box.querySelectorAll(".stagedrop.trad,.evtop[data-name]").forEach(el=> el.onclick=()=>{ const d=DATA.find(x=>x.name===el.dataset.name); if(d) openDetail(d); });
 }
-function stageCard(s, byName){
+function stageCard(s, byName, fx){
   const drops=(s.drops||[]).map(d=>{
     const row=byName.get(d.name), gc=GRADE_COLORS[d.grade]||"#9aa3b8";
     const icon=d.icon?`<img class="icon sm" src="${ICON_BASE}${encodeURIComponent(d.icon)}.png" alt="" loading="lazy" onerror="this.classList.add('noimg');this.removeAttribute('src')">`:`<span class="icon sm noimg"></span>`;
@@ -1816,9 +1830,12 @@ function stageCard(s, byName){
     const pTag = price!=null ? `<span class="dp">${sym()}${price.toFixed(2)}</span>` : "";
     return `<div class="stagedrop${row?' trad':''}"${row?` data-name="${esc(d.name)}" title="ver ${esc(d.name)}"`:""}>${icon}<span class="dn" style="color:${gc}">${esc(d.name)}</span>${pTag}<span class="dr">taxa ${esc(String(d.rate??"—"))}</span></div>`;
   }).join("");
+  // valor tradável esperado por caixa (aprox.) + itens que mais contribuem
+  const evTag = s.ev>0 ? `<span class="evchip" data-tip="valor tradável esperado por caixa aberta (aprox.; só itens com mercado; ignora roll de grade)">≈ ${sym()}${(s.ev*fx).toFixed(2)}/caixa</span>` : "";
+  const top = (s.top&&s.top.length) ? `<div class="evtops">vale por: ${s.top.map(([n,v])=>`<span class="evtop" data-name="${esc(n)}" title="ver ${esc(n)} (${sym()}${(v*fx).toFixed(2)}/caixa)">${esc(n)}</span>`).join(" · ")}</div>` : "";
   return `<div class="stagecard">
-    <div class="sh"><span class="slabel">${esc(s.label||"?")}</span>${s.level!=null?`<span class="meta">Lv ${s.level}</span>`:""}<span class="sname">${esc(s.name||"")}</span>${s.boss?`<span class="sboss">boss: ${esc(s.boss)}</span>`:""}</div>
-    ${drops||'<div class="meta">sem drops</div>'}</div>`;
+    <div class="sh"><span class="slabel">${esc(s.label||"?")}</span>${s.level!=null?`<span class="meta">Lv ${s.level}</span>`:""}<span class="sname">${esc(s.name||"")}</span>${evTag||(s.boss?`<span class="sboss">boss: ${esc(s.boss)}</span>`:"")}</div>
+    ${top}${drops||'<div class="meta">sem drops</div>'}</div>`;
 }
 
 // Top movers: maiores altas/quedas de preço. Usa "desde a reabertura" (chgReopen) quando há dado;
@@ -2016,7 +2033,7 @@ $("tabMarket").onclick = ()=>setView("market");
 $("tabEffects").onclick = ()=>setView("effects");
 $("tabFarm").onclick = ()=>setView("farm");
 ["eq","eSlot","eStat","eSort"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="effects") renderEffects(); }));
-["fq","fAct","fTrad"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="farm") renderFarm(); }));
+["fq","fAct","fSort","fTrad"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="farm") renderFarm(); }));
 populateEffectFilters();
 try{ const sv=localStorage.getItem("tbh_view");
   if(sv==="effects" && gemRows().length) setView("effects");
@@ -2807,16 +2824,66 @@ def _history_feed():
     return {n: pts[-HISTORY_FEED_MAX:] for n, pts in feed.items() if len(pts) >= 2}
 
 
-def _stages_feed():
-    """Stages (farm) compactos p/ o site público: só o necessário p/ os cards + cruzamento com
-    o mercado por nome do drop. Best-effort (vazio se faltar o cache)."""
+def _box_ev_index(price_usd):
+    """Por caixa (dropKey): EV em USD por caixa ABERTA + itens tradáveis que mais contribuem.
+    Resolve drops.json: pool "Base" -> entries (probability) -> ITEMGROUP -> itens (uniforme no grupo)
+    -> preço de mercado (só tradáveis contam $). drops.json (~1MB) fica SÓ no build (não vai ao front).
+    Ressalva: ignora o roll de grade do item dropado (usa o item-base do grupo) e a `rate` não é
+    normalizada -> é uma APROXIMAÇÃO do valor tradável por caixa, não um EV por kill."""
+    drops = get_drops(False)
+    if not drops:
+        return {}
+    key2name = {it.get("key"): join_key(it) for it in get_items(False)}
+
+    def base_pool(tbl):
+        for p in (tbl.get("pools") or []):
+            if p.get("label") == "Base":
+                return p
+        return (tbl.get("pools") or [None])[0]
+
+    idx = {}
+    for tbl in drops:
+        pool = base_pool(tbl)
+        if not pool:
+            continue
+        ev, contrib = 0.0, {}
+        for e in pool.get("entries", []):
+            grp = e.get("items") or ([e["rewardKey"]] if e.get("rewardKey") else [])
+            if not grp:
+                continue
+            pe = (e.get("probability") or 0) / len(grp)        # prob por item (uniforme no grupo)
+            for k in grp:
+                nm = key2name.get(k)
+                pr = price_usd.get(nm) if nm else None
+                if pr:
+                    ev += pe * pr
+                    contrib[nm] = contrib.get(nm, 0) + pe * pr
+        if ev > 0:
+            idx[tbl["dropKey"]] = (ev, sorted(contrib.items(), key=lambda x: -x[1])[:6])
+    return idx
+
+
+def _stages_feed(rows=None):
+    """Stages (farm) compactos p/ o site público: cards + cruzamento com o mercado + EV/caixa (USD)
+    e top itens tradáveis (via _box_ev_index). Best-effort (vazio se faltar cache)."""
+    price_usd = {r["name"]: r["usd"] for r in (rows or []) if r.get("usd")}
+    ev_idx = _box_ev_index(price_usd) if price_usd else {}
     out = []
     for s in get_stages(False):
+        ev, top = 0.0, {}
+        for d in (s.get("drops") or []):
+            be = ev_idx.get(d.get("dropKey"))
+            if be:
+                ev += be[0]
+                for n, v in be[1]:
+                    top[n] = top.get(n, 0) + v
         out.append({
             "label": s.get("label"), "act": s.get("act"), "no": s.get("stageNo"),
             "level": s.get("level"), "name": s.get("name"),
             "type": s.get("type"), "difficulty": s.get("difficulty"),
             "boss": (s.get("boss") or {}).get("name"),
+            "ev": round(ev, 2),    # EV USD/caixa (soma das caixas), só itens tradáveis
+            "top": [[n, round(v, 2)] for n, v in sorted(top.items(), key=lambda x: -x[1])[:5]],
             "drops": [{"name": d.get("name"), "icon": d.get("icon"), "grade": d.get("grade"),
                        "rate": d.get("rate"), "source": d.get("source")}
                       for d in (s.get("drops") or [])],
@@ -2835,7 +2902,7 @@ def write_static(rows, brl_rate, public=False):
         with open(os.path.join(api_dir, "history.json"), "w", encoding="utf-8") as f:
             json.dump(_history_feed(), f, ensure_ascii=False)
         with open(os.path.join(api_dir, "stages.json"), "w", encoding="utf-8") as f:
-            json.dump(_stages_feed(), f, ensure_ascii=False)
+            json.dump(_stages_feed(rows), f, ensure_ascii=False)
     out = os.path.join(HERE, "index.html")
     open(out, "w", encoding="utf-8").write(render_html(rows, brl_rate, public=public))
     extra = " + api/{data,history,stages}.json (público)" if public else ""

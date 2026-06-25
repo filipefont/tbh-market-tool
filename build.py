@@ -1452,20 +1452,24 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
     color:#6a7280; margin:18px 4px 8px; }
   html[data-ui="cubo"] #cbFilterSlot .group { display:flex; flex-direction:column; align-items:stretch;
     gap:8px; border:0; padding:0; }
-  /* padroniza TODAS as caixas da lateral: mesma altura, largura total, alinhadas à esquerda */
+  /* padroniza só as CAIXAS (gatilhos) da lateral via filho-direto — NÃO o conteúdo dos painéis */
   html[data-ui="cubo"] #cbFilterSlot .dropdown { display:block; width:100%; }
   html[data-ui="cubo"] #cbFilterSlot .ddbtn,
-  html[data-ui="cubo"] #cbFilterSlot input,
-  html[data-ui="cubo"] #cbFilterSlot select,
+  html[data-ui="cubo"] #cbFilterSlot > .group > input,
+  html[data-ui="cubo"] #cbFilterSlot > .group > select,
   html[data-ui="cubo"] #cbFilterSlot > .group > button {
-    width:100%; height:38px; box-sizing:border-box; padding:0 11px; font-size:13px;
-    border-radius:9px; text-align:left; }
-  html[data-ui="cubo"] #cbFilterSlot .ddpanel { width:100%; min-width:0; }
-  /* centraliza/alinha o CONTEÚDO de cada caixa (rótulo à esquerda, seta à direita) */
-  html[data-ui="cubo"] #cbFilterSlot .ddbtn { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  html[data-ui="cubo"] #cbFilterSlot select { line-height:36px; }
+    width:100%; height:38px; box-sizing:border-box; padding:0 11px; font-size:13px; border-radius:9px; }
+  html[data-ui="cubo"] #cbFilterSlot .ddbtn { display:flex; align-items:center; justify-content:space-between;
+    gap:8px; text-align:left; background:#11161d; border:1px solid var(--cb-border); color:var(--cb-muted); }
+  html[data-ui="cubo"] #cbFilterSlot .ddbtn.act { background:#11201b; border-color:#2dd4a755; color:var(--accent); }
+  html[data-ui="cubo"] #cbFilterSlot > .group > select { line-height:36px; }
+  html[data-ui="cubo"] #cuboSidebar #q { width:100%; height:38px; box-sizing:border-box; padding:0 11px 0 32px;
+    background-repeat:no-repeat; background-position:11px center;
+    background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='14'%20height='14'%20fill='none'%20stroke='%237e8696'%20stroke-width='2'%3E%3Ccircle%20cx='6'%20cy='6'%20r='4.5'/%3E%3Cpath%20d='M10%2010l3%203'/%3E%3C/svg%3E"); }
+  html[data-ui="cubo"] #cbFilterSlot .ddpanel { min-width:100%; }   /* painel acompanha o gatilho; checkboxes normais */
   html[data-ui="cubo"] #cbFilterSlot .toggle { display:flex; align-items:center; justify-content:flex-start; gap:7px; }
-  html[data-ui="cubo"] #cbFilterSlot #resultcount { display:none; }   /* contagem já aparece no card de stat */
+  html[data-ui="cubo"] #cbFilterSlot #clear { display:none; }       /* usamos o "limpar" do cabeçalho de Filtros */
+  html[data-ui="cubo"] #cbFilterSlot #resultcount { display:none; } /* contagem já aparece no card de stat */
   html[data-ui="cubo"] .cb-rarity { display:flex; flex-wrap:wrap; gap:6px; }
   html[data-ui="cubo"] .cb-rarity span { display:flex; align-items:center; gap:6px; font-size:11px;
     color:var(--cb-muted); background:#11161d; border:1px solid var(--cb-border); border-radius:20px; padding:3px 9px; }
@@ -1476,10 +1480,30 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
   html[data-ui="cubo"] .cb-stat .v { font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700;
     color:var(--accent); margin-top:6px; }
   html[data-ui="cubo"] .cb-stat .s { font-size:11.5px; color:var(--cb-faint); margin-top:3px; }
-  html[data-ui="cubo"] body.view-effects .cb-filters,
-  html[data-ui="cubo"] body.view-farm .cb-filters,
-  html[data-ui="cubo"] body.view-craft .cb-filters,
-  html[data-ui="cubo"] body.view-bag .cb-filters { display:none; }
+  /* divisórias entre seções + cabeçalho de Filtros com "limpar" (igual ao modelo) */
+  html[data-ui="cubo"] .cb-div { height:1px; background:var(--cb-border-soft); margin:16px 0; }
+  html[data-ui="cubo"] .cb-fhead { display:flex; align-items:center; justify-content:space-between; }
+  html[data-ui="cubo"] .cb-fhead .cb-sec-t { margin:18px 4px 8px; }
+  html[data-ui="cubo"] .cb-clear { background:none; border:0; color:var(--accent); font-size:11px; padding:0 4px; cursor:pointer; height:auto; }
+  html[data-ui="cubo"] .cb-clear:hover { text-decoration:underline; background:none; }
+  /* cabeçalho do site no estilo Cubo: logo ◳ + wordmark à esquerda, controles à direita */
+  html[data-ui="cubo"] header { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:14px 22px; }
+  html[data-ui="cubo"] header h1, html[data-ui="cubo"] header .chip, html[data-ui="cubo"] header #baseline { display:none; }
+  html[data-ui="cubo"] header .meta { margin-left:auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  html[data-ui="cubo"] .cb-brand { display:inline-flex; align-items:center; gap:12px; }
+  html[data-ui="cubo"] .cb-logo { width:36px; height:36px; flex:0 0 36px; border-radius:10px; color:#06140f;
+    display:flex; align-items:center; justify-content:center; font-size:19px;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; background:linear-gradient(135deg,#2dd4a7,#1a8d6e); }
+  html[data-ui="cubo"] .cb-brandtext { display:flex; flex-direction:column; line-height:1.2; }
+  html[data-ui="cubo"] .cb-word { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; letter-spacing:-.3px; }
+  html[data-ui="cubo"] .cb-tag { font-size:11.5px; color:var(--cb-faint); }
+  html[data-ui="cubo"] .cb-connect { background:var(--accent); color:var(--accent-ink); border-color:var(--accent);
+    font-weight:600; border-radius:9px; }
+  html[data-ui="cubo"] .cb-connect:hover:not(:disabled) { background:var(--accent); filter:brightness(1.06); }
+  html[data-ui="cubo"] body.view-effects .cb-filters, html[data-ui="cubo"] body.view-effects #cbSearchSlot,
+  html[data-ui="cubo"] body.view-farm .cb-filters, html[data-ui="cubo"] body.view-farm #cbSearchSlot,
+  html[data-ui="cubo"] body.view-craft .cb-filters, html[data-ui="cubo"] body.view-craft #cbSearchSlot,
+  html[data-ui="cubo"] body.view-bag .cb-filters, html[data-ui="cubo"] body.view-bag #cbSearchSlot { display:none; }
   @media (max-width:760px){
     html[data-ui="cubo"] body { grid-template-columns:1fr; grid-template-areas:"head" "side" "main" "foot"; }
     html[data-ui="cubo"] #cuboSidebar { position:static; max-height:none; border-right:0;
@@ -1489,6 +1513,10 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
 </style></head>
 <body>
 <header>
+  <div class="cb-brand cubo-only">
+    <span class="cb-logo">◳</span>
+    <span class="cb-brandtext"><span class="cb-word">Cubo</span><span class="cb-tag">Mercado do Task Bar Hero</span></span>
+  </div>
   <h1>TBH Market Tool — Itens × Mercado Steam</h1>
   <div class="meta">
     <span class="chip" data-tip="data/hora em que o ranking (bulk) foi gerado — horário do build (UTC no GitHub Actions); veja o horário local em 'preços atualizados'">📅 bulk: __GENERATED__</span>
@@ -1498,6 +1526,8 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
         data-tip="alterne entre o layout atual e o novo (Cubo, em validação) — sua escolha fica salva e vai no link">
       <button type="button" data-ui="atual">Atual</button><button type="button" data-ui="cubo">Cubo<span class="beta">beta</span></button>
     </span>
+    <button type="button" class="cb-connect cubo-only" id="cbConnect"
+        data-tip="ler o save do jogo e ver o valor da sua mochila (em desenvolvimento)">⬆ Conectar save</button>
   </div>
   <div class="meta" id="baseline" style="margin-top:6px"></div>
 </header>
@@ -1509,11 +1539,15 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
   <button id="tabBag" class="tab" role="tab" aria-selected="false" data-tip="valor da sua mochila a partir do save do jogo — em desenvolvimento">🎒 Minha Mochila<span class="badge-new">em breve</span></button>
 </nav>
 <aside id="cuboSidebar" aria-label="navegação e filtros (layout Cubo)">
+  <div id="cbSearchSlot"></div>
+  <div class="cb-sec-t">Navegação</div>
   <nav id="cbNav" aria-label="seções"></nav>
+  <div class="cb-div"></div>
   <div class="cb-filters">
-    <div class="cb-sec-t">Filtros</div>
+    <div class="cb-fhead"><span class="cb-sec-t">Filtros</span><button type="button" id="cbClear" class="cb-clear">limpar</button></div>
     <div id="cbFilterSlot"></div>
   </div>
+  <div class="cb-div"></div>
   <div class="cb-sec-t">Raridade</div>
   <div id="cbRarity" class="cb-rarity"></div>
   <div id="cbStat" class="cb-stat"></div>
@@ -2455,7 +2489,7 @@ function renderCuboCards(rows, maxPpr, dealCut){
   ensureHist().then(injectCuboSparks);   // mini-sparklines (1 fetch cacheado; preenche depois)
 }
 // ---- Sidebar do Cubo (Fase 2b): nav vertical, legenda de raridade, stat, realocação de filtros ----
-const CB_NAV = [["market","Ranking"],["effects","Efeitos"],["farm","Farm"],["craft","Craft"],["bag","🎒 Minha Mochila"]];
+const CB_NAV = [["market","◆ Ranking"],["effects","✦ Efeitos"],["farm","⛏ Farm"],["craft","⚒ Craft"],["bag","🎒 Minha Mochila"]];
 function buildCuboNav(){
   const el=$("cbNav"); if(!el || el.dataset.built) return;
   el.innerHTML = CB_NAV.map(([v,l])=>`<button type="button" data-view="${v}">${l}</button>`).join("");
@@ -2482,10 +2516,16 @@ function updateCuboStat(visible){
 // move o GRUPO de filtros (busca + dropdowns + toggles) entre a barra do topo e a sidebar.
 // move o nó real (preserva os event listeners já fiados); idempotente.
 function relocateFilters(toCubo){
-  const slot=$("cbFilterSlot"), mc=$("marketControls"), grp=$("filterGroup");
+  const slot=$("cbFilterSlot"), mc=$("marketControls"), grp=$("filterGroup"),
+        sslot=$("cbSearchSlot"), q=$("q");
   if(!slot||!mc||!grp) return;
-  if(toCubo){ if(grp.parentElement!==slot) slot.appendChild(grp); }
-  else { if(grp.parentElement!==mc) mc.insertBefore(grp, mc.firstChild); }
+  if(toCubo){
+    if(grp.parentElement!==slot) slot.appendChild(grp);
+    if(q && sslot && q.parentElement!==sslot) sslot.appendChild(q);        // busca no TOPO da sidebar
+  } else {
+    if(q && q.parentElement!==grp) grp.insertBefore(q, grp.firstChild);    // busca volta p/ início do grupo
+    if(grp.parentElement!==mc) mc.insertBefore(grp, mc.firstChild);
+  }
 }
 function render(){
   const rows = currentRows();
@@ -2732,6 +2772,8 @@ function setCuboSort(k){
     b.onclick = ()=>setCuboMode(b.dataset.m);
   });
   const sel=$("cuboSort"); if(sel){ sel.value=cuboSort; sel.onchange=()=>setCuboSort(sel.value); }
+  const cc=$("cbClear"); if(cc) cc.onclick=clearFilters;        // "limpar" do cabeçalho de Filtros
+  const cs=$("cbConnect"); if(cs) cs.onclick=()=>setView("bag"); // "Conectar save" -> aba Mochila
   if(isCubo()){ sortK=cuboSort; sortDir=CB_SORT_ASC.has(cuboSort)?1:-1; }   // 1º render correto
   buildCuboNav();
   relocateFilters(isCubo());

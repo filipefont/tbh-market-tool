@@ -1346,7 +1346,7 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
   html[data-ui="cubo"] .seg { border-color:var(--cb-border); border-radius:9px; }
   html[data-ui="cubo"] .seg button.on { background:var(--accent); color:var(--accent-ink); }
   /* botões com identidade antiga -> identidade Cubo (menta/âmbar) */
-  html[data-ui="cubo"] button.toggle.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  html[data-ui="cubo"] button.toggle.on { background:#11201b; color:var(--accent); border-color:#2dd4a755; }
   html[data-ui="cubo"] a.steam { border-color:var(--cb-border); color:var(--cb-muted); }
   html[data-ui="cubo"] a.steam:hover { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
   html[data-ui="cubo"] .fav:hover, html[data-ui="cubo"] .fav.on { color:var(--gold); }
@@ -2484,7 +2484,7 @@ function cuboCardHtml(d, gc, rank){
     </div>
     <div class="cc-metric">
       <div><div class="cc-big">${d.goldPerEst!=null?fmtAbbr(d.goldPerEst):"—"}</div><div class="cc-lbl">gold / ${sym().trim()}</div></div>
-      <div class="cc-right"><span class="cc-spark" data-name="${esc(d.name)}" data-color="${deltaColor(d)}" data-fill="${gc}22"></span>${trendCell(d)}</div>
+      <div class="cc-right"><span class="cc-spark" data-name="${esc(d.name)}" data-color="#2dd4a7" data-fill="rgba(45,212,167,.14)"></span>${trendCell(d)}</div>
     </div>
     <div class="cc-foot"><span>Gold <b data-tip="${fmt(d.gold)} gold">${fmtAbbr(d.gold)}</b></span><span>Preço <b>${cuboPrice(d)}</b></span></div>
   </div>`;

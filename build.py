@@ -21,6 +21,7 @@ Segurança (modo serve): bind só em 127.0.0.1, validação de Host, token CSRF,
 nomes (anti-SSRF), throttle + cache TTL p/ proteger a API da Steam. Detalhes no README.
 """
 import argparse
+import hashlib
 import json
 import os
 import random
@@ -2825,10 +2826,17 @@ def _split_template(tmpl):
     js = m_js.group(1)
     i = js.index(_JS_SPLIT_MARK)
     config_js, app_js = js[:i], js[i:]                       # config (placeholders) | código estável
-    shell = tmpl.replace(m_css.group(0), '<link rel="stylesheet" href="assets/styles.css">')
+    css = m_css.group(1).strip("\n")
+    # cache-busting por hash de conteúdo (?v=): um index.html novo SEMPRE puxa o asset casado.
+    # Sem isso, o browser servia o app.js velho do cache (max-age=600) contra o index novo —
+    # aba/feature recém-deployada "não funcionava" até o cache expirar. O hash só muda quando o
+    # asset muda, então builds sem mudança de código reaproveitam o cache normalmente.
+    css_v = hashlib.sha1(css.encode("utf-8")).hexdigest()[:8]
+    js_v = hashlib.sha1(app_js.encode("utf-8")).hexdigest()[:8]
+    shell = tmpl.replace(m_css.group(0), f'<link rel="stylesheet" href="assets/styles.css?v={css_v}">')
     shell = shell.replace(
-        m_js.group(0), "<script>" + config_js + "</script>\n<script src=\"assets/app.js\" defer></script>")
-    css, app_js = m_css.group(1).strip("\n"), app_js
+        m_js.group(0),
+        "<script>" + config_js + f"</script>\n<script src=\"assets/app.js?v={js_v}\" defer></script>")
     for ph in ("__DATA__", "__TOKEN__", "__PUBLIC__", "__GEN_EPOCH__", "__SITE__",
                "__N__", "__RATE__", "__GENERATED__", "__SERVER_CONTROLS__"):
         assert ph not in css and ph not in app_js, f"placeholder {ph} vazou p/ um asset estático"

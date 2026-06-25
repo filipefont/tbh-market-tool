@@ -110,6 +110,31 @@ if _os.path.exists(build.EFFECTS_CACHE) and _os.path.exists(build.ITEMS_CACHE):
         build.attach_game_extras(_rows, _items, refresh=False)
         check(_rows[0].get("effects"), f"attach_game_extras não anexou efeitos em '{_gem}'")
 
+# 6) feed de CRAFT (receitas) — modelo + integridade dos nomes p/ o clique de detalhe.
+# Protege contra regressão no _craft_feed e na junção recipes.json × mercado.
+if os.path.exists(build.RECIPES_CACHE) and os.path.exists(build.ITEMS_CACHE):
+    _items = json.load(open(build.ITEMS_CACHE, encoding="utf-8"))
+    _steam = build.get_steam(False)
+    _rows, _ = build.build_rows(_items, _steam, build.load_enriched())
+    _craft = build._craft_feed(_rows)
+    check(len(_craft) > 0, "_craft_feed vazio (recipes.json/junção quebrou?)")
+    _names = {r["name"] for r in _rows}
+    for c in _craft:
+        check(c["verdict"] in ("craft", "gamble", "sell", "unknown"),
+              f"veredito inválido: {c.get('verdict')}")
+        # custo desconhecido <=> veredito 'unknown' (material sem preço)
+        check((c["cost"] is None) == (c["verdict"] == "unknown"),
+              f"custo None deve casar com veredito 'unknown' ({c['type']} T{c['tier']})")
+        for g in c["grades"]:
+            b = g.get("best")
+            if b and b.get("mname"):
+                check(b["mname"] in _names,
+                      f"best.mname '{b['mname']}' fora do mercado (clique de detalhe quebra)")
+    # a aba existe no HTML público e referencia o feed
+    if os.path.exists(idx):
+        check('id="tabCraft"' in html and 'id="craftView"' in html,
+              "index.html sem a aba/seção de Craft")
+
 if fails:
     print("SMOKE: FALHOU")
     for f in fails:

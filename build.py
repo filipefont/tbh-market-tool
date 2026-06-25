@@ -1406,6 +1406,49 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
     html[data-ui="cubo"] .cubohero { grid-template-columns:1fr; }
     html[data-ui="cubo"] .ch-delta { align-self:flex-start; }
   }
+
+  /* ---- Fase 2b: sidebar (nav vertical + filtros + raridade + stat) no layout Cubo ---- */
+  #cuboSidebar { display:none; }
+  html[data-ui="cubo"] nav.tabs { display:none; }   /* navegação vira vertical na sidebar */
+  html[data-ui="cubo"] body { display:grid; grid-template-columns:248px minmax(0,1fr);
+    grid-template-areas:"head head" "side main" "foot foot"; }
+  html[data-ui="cubo"] header { grid-area:head; }
+  html[data-ui="cubo"] footer { grid-area:foot; }
+  html[data-ui="cubo"] #cuboMain { grid-area:main; min-width:0; }
+  html[data-ui="cubo"] #cuboSidebar { grid-area:side; display:block; background:var(--cb-sidebar);
+    border-right:1px solid var(--cb-border-soft); padding:16px 14px;
+    position:sticky; top:0; align-self:start; max-height:100vh; overflow:auto; }
+  html[data-ui="cubo"] #cbNav { display:flex; flex-direction:column; gap:3px; }
+  html[data-ui="cubo"] #cbNav button { text-align:left; background:transparent; border:1px solid transparent;
+    border-radius:9px; padding:9px 11px; color:var(--cb-muted); font-size:13.5px; cursor:pointer; }
+  html[data-ui="cubo"] #cbNav button:hover { background:#11161d; }
+  html[data-ui="cubo"] #cbNav button.on { background:#11201b; color:var(--accent); font-weight:600; }
+  html[data-ui="cubo"] .cb-sec-t { font-size:10px; text-transform:uppercase; letter-spacing:.7px;
+    color:#6a7280; margin:18px 4px 8px; }
+  html[data-ui="cubo"] #cbFilterSlot .group { display:flex; flex-direction:column; align-items:stretch;
+    gap:7px; border:0; padding:0; }
+  html[data-ui="cubo"] #cbFilterSlot .dropdown, html[data-ui="cubo"] #cbFilterSlot input,
+  html[data-ui="cubo"] #cbFilterSlot select, html[data-ui="cubo"] #cbFilterSlot button { width:100%; }
+  html[data-ui="cubo"] .cb-rarity { display:flex; flex-wrap:wrap; gap:6px; }
+  html[data-ui="cubo"] .cb-rarity span { display:flex; align-items:center; gap:6px; font-size:11px;
+    color:var(--cb-muted); background:#11161d; border:1px solid var(--cb-border); border-radius:20px; padding:3px 9px; }
+  html[data-ui="cubo"] .cb-rarity i { width:9px; height:9px; border-radius:3px; display:inline-block; }
+  html[data-ui="cubo"] .cb-stat { margin-top:18px; background:linear-gradient(135deg,#11201b,#0e1318);
+    border:1px solid #1e2b27; border-radius:12px; padding:14px; }
+  html[data-ui="cubo"] .cb-stat .k { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:#6a7280; }
+  html[data-ui="cubo"] .cb-stat .v { font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700;
+    color:var(--accent); margin-top:6px; }
+  html[data-ui="cubo"] .cb-stat .s { font-size:11.5px; color:var(--cb-faint); margin-top:3px; }
+  html[data-ui="cubo"] body.view-effects .cb-filters,
+  html[data-ui="cubo"] body.view-farm .cb-filters,
+  html[data-ui="cubo"] body.view-craft .cb-filters,
+  html[data-ui="cubo"] body.view-bag .cb-filters { display:none; }
+  @media (max-width:760px){
+    html[data-ui="cubo"] body { grid-template-columns:1fr; grid-template-areas:"head" "side" "main" "foot"; }
+    html[data-ui="cubo"] #cuboSidebar { position:static; max-height:none; border-right:0;
+      border-bottom:1px solid var(--cb-border-soft); }
+    html[data-ui="cubo"] #cbNav { flex-direction:row; flex-wrap:wrap; }
+  }
 </style></head>
 <body>
 <header>
@@ -1428,8 +1471,19 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
   <button id="tabCraft" class="tab" role="tab" aria-selected="false" data-tip="craft (receitas): custo dos reagentes × valor dos itens da pull — vale craftar ou vender os materiais?">Craft</button>
   <button id="tabBag" class="tab" role="tab" aria-selected="false" data-tip="valor da sua mochila a partir do save do jogo — em desenvolvimento">🎒 Minha Mochila<span class="badge-new">em breve</span></button>
 </nav>
+<aside id="cuboSidebar" aria-label="navegação e filtros (layout Cubo)">
+  <nav id="cbNav" aria-label="seções"></nav>
+  <div class="cb-filters">
+    <div class="cb-sec-t">Filtros</div>
+    <div id="cbFilterSlot"></div>
+  </div>
+  <div class="cb-sec-t">Raridade</div>
+  <div id="cbRarity" class="cb-rarity"></div>
+  <div id="cbStat" class="cb-stat"></div>
+</aside>
+<div id="cuboMain">
 <div class="controls" id="marketControls">
-  <div class="group">
+  <div class="group" id="filterGroup">
     <input type="text" id="q" placeholder="buscar por nome..." aria-label="buscar por nome">
     <div class="dropdown" id="f_grade"></div>
     <div class="dropdown" id="f_type"></div>
@@ -1571,6 +1625,7 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
     </ul>
   </div>
 </section>
+</div><!-- /#cuboMain -->
 <div id="toasts"></div>
 <div id="detailOverlay"></div>
 <aside id="detail" role="dialog" aria-modal="true" aria-label="detalhes do item" hidden></aside>
@@ -2013,7 +2068,7 @@ function setView(v){
   for(const [id,name] of [["tabMarket","market"],["tabEffects","effects"],["tabFarm","farm"],["tabCraft","craft"],["tabBag","bag"]]){
     const on=v===name; $(id).classList.toggle("on", on); $(id).setAttribute("aria-selected", String(on)); }
   try{ localStorage.setItem("tbh_view", v); }catch(e){}
-  syncCuboMode();
+  syncCuboMode(); syncCuboNav();
   if(v==="effects") renderEffects(); else if(v==="farm") renderFarm();
   else if(v==="craft") renderCraft(); else if(v==="bag") renderBag(); else render();
 }
@@ -2319,6 +2374,38 @@ function renderCuboCards(rows, maxPpr, dealCut){
   const cards=(page===1)?pageRows.slice(1):pageRows;
   grid.innerHTML=cards.map((d,i)=>cuboCardHtml(d, GRADE_COLORS[d.grade]||"#9aa3b8", off+(page===1?2:1)+i)).join("");
 }
+// ---- Sidebar do Cubo (Fase 2b): nav vertical, legenda de raridade, stat, realocação de filtros ----
+const CB_NAV = [["market","Ranking"],["effects","Efeitos"],["farm","Farm"],["craft","Craft"],["bag","🎒 Minha Mochila"]];
+function buildCuboNav(){
+  const el=$("cbNav"); if(!el || el.dataset.built) return;
+  el.innerHTML = CB_NAV.map(([v,l])=>`<button type="button" data-view="${v}">${l}</button>`).join("");
+  el.querySelectorAll("button").forEach(b=> b.onclick=()=>setView(b.dataset.view));
+  el.dataset.built="1";
+  syncCuboNav();
+}
+function syncCuboNav(){
+  document.querySelectorAll("#cbNav button").forEach(b=>b.classList.toggle("on", b.dataset.view===curView));
+}
+function buildCuboRarity(){
+  const el=$("cbRarity"); if(!el || el.dataset.built || !DATA.length) return;
+  const present=[...new Set(DATA.map(d=>d.grade).filter(Boolean))]
+    .sort((a,b)=>(GRADE_RANK[a]??99)-(GRADE_RANK[b]??99));
+  el.innerHTML = present.map(g=>`<span><i style="background:${GRADE_COLORS[g]||'#9aa3b8'}"></i>${esc(titleCase(g))}</span>`).join("");
+  el.dataset.built="1";
+}
+function updateCuboStat(visible){
+  const el=$("cbStat"); if(!el) return;
+  el.innerHTML = `<div class="k">Itens monitorados</div><div class="v">${fmt(DATA.length)}</div>`
+    + `<div class="s">${visible!=null? fmt(visible)+" visíveis no filtro" : "mercado cruzado com a Steam"}</div>`;
+}
+// move o GRUPO de filtros (busca + dropdowns + toggles) entre a barra do topo e a sidebar.
+// move o nó real (preserva os event listeners já fiados); idempotente.
+function relocateFilters(toCubo){
+  const slot=$("cbFilterSlot"), mc=$("marketControls"), grp=$("filterGroup");
+  if(!slot||!mc||!grp) return;
+  if(toCubo){ if(grp.parentElement!==slot) slot.appendChild(grp); }
+  else { if(grp.parentElement!==mc) mc.insertBefore(grp, mc.firstChild); }
+}
 function render(){
   const rows = currentRows();
   renderMovers();
@@ -2332,6 +2419,7 @@ function render(){
     + `média <b>${fmt(mean)}</b> · mediana <b>${fmt(med)}</b> · <b>${fmt(rows.length)}</b> visíveis de ${fmt(DATA.length)}`;
   $("count").textContent = DATA.length;
   $("resultcount").textContent = `${rows.length} / ${DATA.length}`;
+  buildCuboRarity(); updateCuboStat(rows.length);   // sidebar do Cubo (no-op visual fora do Cubo)
   renderChips();
   updateHeaders();
   updateEnrichBtn(rows);
@@ -2522,8 +2610,10 @@ function setUI(v){
        if(v==="atual") u.searchParams.delete("ui"); else u.searchParams.set("ui", v);
        history.replaceState(null, "", u); }catch(e){}
   document.querySelectorAll("#uiSwitch button").forEach(b=>b.classList.toggle("on", b.dataset.ui===v));
+  relocateFilters(v==="cubo");        // filtros na sidebar (Cubo) ou na barra do topo (Atual)
+  buildCuboNav(); buildCuboRarity();
   syncCuboMode();
-  if(curView==="market") render();   // re-renderiza Mercado como cartões/tabela conforme o layout
+  if(curView==="market") render(); else updateCuboStat(null);   // re-render Mercado conforme layout
 }
 (function initUISwitch(){
   const cur = document.documentElement.getAttribute("data-ui") || "atual";
@@ -2545,6 +2635,8 @@ function setCuboMode(m){
     b.classList.toggle("on", b.dataset.m===cuboMode);
     b.onclick = ()=>setCuboMode(b.dataset.m);
   });
+  buildCuboNav();                 // nav vertical da sidebar
+  relocateFilters(isCubo());      // se já abriu em ?ui=cubo, filtros já vão p/ a sidebar
   syncCuboMode();
 })();
 // abrir detalhe ao clicar/Enter num cartão ou no hero (reusa openDetail com o item cru de DATA)

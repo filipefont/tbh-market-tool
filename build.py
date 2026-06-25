@@ -1461,6 +1461,7 @@ function freshestReal(d){
 }
 // item precisa de (re)busca? sem nenhum preço real, ou o mais fresco já passou do limite
 function needsUpdate(d){
+  if(d.gradeLock) return false;           // travado na reabertura: nada a consultar
   const b = freshestReal(d);
   if(!b) return true;
   return (Date.now()/1000 - b.fetchedAt) > STALE_S;
@@ -2709,7 +2710,9 @@ def enrich(rows, top_n, curkey):
     enriched = load_enriched()
     updates = {}
     print(f"\n[enrich] priceoverview ({curkey.upper()}) das {top_n} melhores por gold/$...")
-    for r in rows[:top_n]:
+    # pula itens travados na reabertura (intradáveis): não há preço a buscar -> prioriza tradáveis
+    cands = [r for r in rows if not r.get("gradeLock")][:top_n]
+    for r in cands:
         po = price_overview(r["name"], curkey)
         if not po:
             print(f"  - {r['name']}: sem dados")
@@ -2739,7 +2742,8 @@ def enrich_orderbook(rows, top_n):
     Salva o cache incrementalmente (a cada ORDERBOOK_FLUSH_EVERY itens): uma coleta longa pode
     estourar o timeout do passo do CI; sem flush, todo o progresso se perderia."""
     book = load_orderbook()
-    candidates = sorted((r for r in rows if r.get("listings")),
+    # só itens com listagem e NÃO travados (intradáveis não têm encomenda a coletar)
+    candidates = sorted((r for r in rows if r.get("listings") and not r.get("gradeLock")),
                         key=lambda r: r["listings"], reverse=True)
     limit = len(candidates) if top_n <= 0 else top_n
     pending, done = {}, 0  # `pending`: coletas ainda não persistidas (zera a cada flush)

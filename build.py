@@ -756,7 +756,8 @@ def _item_attrs(it):
 def _row_from_item(it, name, usd, listings, enriched, book=None):
     """Monta uma linha. usd=None => item sem preço do bulk (marcado noBulk)."""
     row = {
-        "name": name,
+        "name": name,                       # nome de mercado (com grade/variante) — chave p/ Steam/fav/histórico
+        "base": it.get("name") or name,     # nome "limpo" p/ exibir (sem "(Grade) A")
         "type": it["type"],
         "grade": it.get("grade"),
         "gradeRank": it.get("gradeRank"),   # 0..9 p/ ordenar grade por raridade
@@ -791,6 +792,8 @@ def _row_from_item(it, name, usd, listings, enriched, book=None):
 
 
 def build_rows(items, steam, enriched=None, book=None):
+    # itens variante "B" não são mais vendáveis no mercado -> fora das consultas e levantamentos.
+    items = [it for it in items if (it.get("variant") or "A") != "B"]
     by_key = {}
     for it in items:
         by_key.setdefault(join_key(it), it)
@@ -974,6 +977,16 @@ HTML_TEMPLATE = r"""<!doctype html>
 <meta name="twitter:title" content="TBH Market Tool — Itens × Mercado Steam">
 <meta name="twitter:description" content="Ranking de itens do Task Bar Hero por retorno em gold e gold/R$.">
 <meta name="twitter:image" content="__SITE__/assets/og.png">
+<!-- fontes do layout "Cubo" (redesign opt-in). Só usadas quando data-ui="cubo". -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- A/B de layout: define data-ui ANTES do CSS pintar (evita flash). Atual = default; Cubo = opt-in.
+     URL ?ui=cubo|atual tem prioridade e fica salvo; senão usa o localStorage. -->
+<script>(function(){try{var u=new URLSearchParams(location.search).get("ui");
+var v=u||localStorage.getItem("tbh_ui")||"atual";if(v!=="cubo")v="atual";
+document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tbh_ui",v);
+}catch(e){document.documentElement.setAttribute("data-ui","atual");}})();</script>
 <style>
   /* Identidade "terminal de mercado": base escura, acento ESMERALDA (ticker), ouro p/ destaque,
      números em mono tabular. Cores de grade dos itens (raridade) ficam à parte. */
@@ -1067,10 +1080,11 @@ HTML_TEMPLATE = r"""<!doctype html>
   .tab.on { color:#e8ebf2; background:#ffffff0d; border-color:#ffffff1f; font-weight:600;
             box-shadow:inset 0 -2px 0 var(--accent); }
   /* alternância de view: por padrão mostra o Mercado; .view-effects / .view-farm / .view-craft trocam de aba */
-  #effectsView, #farmView, #craftView { display:none; }
-  body.view-effects #effectsView, body.view-farm #farmView, body.view-craft #craftView { display:block; }
+  #effectsView, #farmView, #craftView, #bagView { display:none; }
+  body.view-effects #effectsView, body.view-farm #farmView, body.view-craft #craftView, body.view-bag #bagView { display:block; }
   body.view-effects #marketControls, body.view-effects #activeFilters, body.view-effects #movers, body.view-effects .wrap, body.view-effects #pager,
   body.view-farm #marketControls, body.view-farm #activeFilters, body.view-farm #movers, body.view-farm .wrap, body.view-farm #pager,
+  body.view-bag #marketControls, body.view-bag #activeFilters, body.view-bag #movers, body.view-bag .wrap, body.view-bag #pager,
   body.view-craft #marketControls, body.view-craft #activeFilters, body.view-craft #movers, body.view-craft .wrap, body.view-craft #pager { display:none; }
   /* barra de paginação */
   #pager { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:8px 20px; font-size:12px; color:#9aa3b8; }
@@ -1287,14 +1301,253 @@ HTML_TEMPLATE = r"""<!doctype html>
   #detail .dactions a, #detail .dactions button { font-size:12px; }
   .spark { width:100%; height:54px; display:block; }
   .sparkwrap { background:#0f1116; border:1px solid #21242e; border-radius:8px; padding:8px; }
+  /* ===== Seletor A/B de layout (sempre visível, nos dois temas) ===== */
+  .uiswitch { margin-left:10px; vertical-align:middle; }
+  .uiswitch button { padding:4px 10px; font-size:11px; }
+  .uiswitch .beta { font-size:9px; opacity:.75; margin-left:3px; }
+  /* ===== Aba/seção "Minha Mochila" (stub — em desenvolvimento, nos dois temas) ===== */
+  .badge-new { font-size:9px; font-weight:700; color:#08130d; background:#19c37d; border-radius:10px;
+               padding:1px 6px; margin-left:5px; vertical-align:middle; }
+  #bagView { padding:46px 20px; }
+  .bagdev { max-width:580px; margin:0 auto; text-align:center; background:#161922;
+            border:1px solid #2a2e3a; border-radius:16px; padding:36px 30px; }
+  .bagdev .ico { font-size:44px; line-height:1; }
+  .bagdev h2 { margin:16px 0 8px; font-size:20px; }
+  .bagdev p { color:#9aa3b8; font-size:14px; line-height:1.55; margin:6px auto; max-width:460px; }
+  .bagdev .devtag { display:inline-block; margin-top:6px; font-size:11px; font-weight:700;
+                    color:#1c1404; background:#f4c430; border-radius:20px; padding:4px 12px; }
+  .bagdev .connect { margin-top:20px; opacity:.55; cursor:not-allowed; }
+  .bagdev .road { margin-top:20px; text-align:left; display:inline-block; color:#9aa3b8; font-size:13px; }
+  .bagdev .road li { margin:4px 0; }
+
+  /* ======================= LAYOUT "CUBO" — redesign opt-in (data-ui="cubo") =======================
+     Fase 1: re-skin (paleta menta/âmbar + fontes Space Grotesk/Figtree/IBM Plex Mono) sobre a
+     estrutura atual. Fase 2 (layout sidebar+hero+cartões) virá em cima destes tokens. */
+  html[data-ui="cubo"] {
+    --row:#11161d; --row-alt:#0e131a; --row-hover:#161d27;
+    --accent:#2dd4a7; --accent-ink:#06140f; --gold:#f0a93b;
+    --font-mono:'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+    --cb-bg:#0c0f14; --cb-surface:#11161d; --cb-sidebar:#0a0d12;
+    --cb-border:#232a35; --cb-border-soft:#1b2029; --cb-text:#eef1f5;
+    --cb-muted:#aeb6c2; --cb-faint:#7e8696;
+  }
+  html[data-ui="cubo"] body { background:var(--cb-bg); color:var(--cb-text);
+    font-family:'Figtree', system-ui, sans-serif; }
+  html[data-ui="cubo"] h1 { font-family:'Space Grotesk','Figtree',sans-serif; letter-spacing:-.3px; }
+  html[data-ui="cubo"] header { background:var(--cb-sidebar); border-bottom-color:var(--cb-border-soft); }
+  html[data-ui="cubo"] .meta { color:var(--cb-faint); }
+  html[data-ui="cubo"] .chip { background:#11161d; border-color:var(--cb-border); color:var(--cb-muted); }
+  html[data-ui="cubo"] a { color:var(--accent); }
+  html[data-ui="cubo"] .controls { background:var(--cb-surface); border-bottom-color:var(--cb-border-soft); }
+  html[data-ui="cubo"] .group + .group { border-left-color:var(--cb-border); }
+  html[data-ui="cubo"] input, html[data-ui="cubo"] select, html[data-ui="cubo"] button {
+    background:#0e131a; border-color:var(--cb-border); color:var(--cb-text); border-radius:9px; }
+  html[data-ui="cubo"] button:hover:not(:disabled) { background:#1a212b; }
+  html[data-ui="cubo"] .seg { border-color:var(--cb-border); border-radius:9px; }
+  html[data-ui="cubo"] .seg button.on { background:var(--accent); color:var(--accent-ink); }
+  /* botões com identidade antiga -> identidade Cubo (menta/âmbar) */
+  html[data-ui="cubo"] button.toggle.on { background:#11201b; color:var(--accent); border-color:#2dd4a755; }
+  html[data-ui="cubo"] a.steam { border-color:var(--cb-border); color:var(--cb-muted); }
+  html[data-ui="cubo"] a.steam:hover { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  html[data-ui="cubo"] .fav:hover, html[data-ui="cubo"] .fav.on { color:var(--gold); }
+  html[data-ui="cubo"] #pager button.cur { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  html[data-ui="cubo"] .fchip { background:#11161d; border-color:var(--cb-border); color:var(--cb-muted); }
+  html[data-ui="cubo"] #activeFilters { background:var(--cb-surface); border-bottom-color:var(--cb-border-soft); }
+  /* barra de controles do Mercado (moeda/ordenação/visão) alinhada à direita, como no modelo */
+  html[data-ui="cubo"] #marketControls { justify-content:flex-end; background:transparent; border-bottom:0; padding-top:14px; }
+  html[data-ui="cubo"] .cb-visao { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--cb-muted); }
+  html[data-ui="cubo"] .cb-visao select { height:36px; border-radius:9px; }
+  html[data-ui="cubo"] .tab { color:var(--cb-faint); }
+  html[data-ui="cubo"] .tab.on { color:var(--cb-text); background:#11201b; border-color:#2dd4a733;
+    box-shadow:inset 0 -2px 0 var(--accent); font-weight:600; }
+  html[data-ui="cubo"] table { font-family:'Figtree', sans-serif; }
+  html[data-ui="cubo"] thead th { background:var(--cb-surface); color:var(--cb-faint); }
+  html[data-ui="cubo"] th, html[data-ui="cubo"] td { border-bottom-color:var(--cb-border-soft); }
+  html[data-ui="cubo"] .bagdev { background:var(--cb-surface); border-color:var(--cb-border); }
+
+  /* ---- Fase 2: toggle cartões/tabela + hero + grade de cartões (só no layout Cubo) ---- */
+  .cubo-only { display:none !important; }
+  html[data-ui="cubo"] .cubo-only { display:inline-flex !important; }
+  #cuboView { display:none; padding:14px 20px 2px; }
+  body.cubo-cards #cuboView { display:block; }
+  body.cubo-cards .wrap { display:none; }
+  html[data-ui="cubo"] .cbtile { display:inline-flex; align-items:center; justify-content:center;
+    flex:0 0 auto; width:42px; height:42px; border-radius:11px; border:1px solid;
+    font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; }
+  html[data-ui="cubo"] .cbtile.lg { width:54px; height:54px; border-radius:13px; font-size:13px; }
+  html[data-ui="cubo"] .cbtile { position:relative; overflow:hidden; }
+  html[data-ui="cubo"] .cbtile img { position:absolute; inset:0; width:100%; height:100%;
+    object-fit:contain; padding:5px; image-rendering:pixelated; }   /* cobre a abreviação quando carrega */
+  html[data-ui="cubo"] .cc-dot { width:8px; height:8px; border-radius:3px; display:inline-block; flex:0 0 auto; }
+  html[data-ui="cubo"] .cc-mut, html[data-ui="cubo"] .cc-lbl { color:var(--cb-faint); }
+  /* hero "melhor negócio agora" */
+  html[data-ui="cubo"] .cubohero { display:grid; grid-template-columns:1fr auto; gap:18px; align-items:center;
+    background:linear-gradient(120deg,#11201b,#0e1318 72%); border:1px solid #1e2b27; border-radius:16px;
+    padding:20px 22px; margin-bottom:16px; cursor:pointer; }
+  html[data-ui="cubo"] .cubohero:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  html[data-ui="cubo"] .ch-badges { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  html[data-ui="cubo"] .ch-top { font-size:11px; font-weight:700; color:#1c1404; background:var(--gold); border-radius:6px; padding:3px 9px; }
+  html[data-ui="cubo"] .ch-deal { font-size:11px; font-weight:700; color:var(--accent-ink); background:var(--accent); border-radius:20px; padding:3px 10px; }
+  html[data-ui="cubo"] .ch-id { display:flex; align-items:center; gap:14px; margin-top:14px; }
+  html[data-ui="cubo"] .ch-name { font-family:'Space Grotesk',sans-serif; font-size:23px; font-weight:600; letter-spacing:-.3px; }
+  html[data-ui="cubo"] .ch-sub { display:flex; align-items:center; gap:6px; margin-top:5px; font-size:12.5px; }
+  html[data-ui="cubo"] .ch-nums { display:flex; gap:24px; margin-top:18px; flex-wrap:wrap; }
+  html[data-ui="cubo"] .ch-sep { border-left:1px solid #1e2b27; padding-left:24px; }
+  html[data-ui="cubo"] .ch-big { font-family:'Space Grotesk',sans-serif; font-size:32px; font-weight:700; line-height:1; }
+  html[data-ui="cubo"] .ch-big.accent { color:var(--accent); }
+  html[data-ui="cubo"] .ch-delta { align-self:flex-end; font-size:13px; color:var(--cb-faint); white-space:nowrap; }
+  /* grade de cartões */
+  html[data-ui="cubo"] #cuboGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(258px,1fr)); gap:14px; }
+  html[data-ui="cubo"] .cubocard { background:var(--cb-surface); border:1px solid var(--cb-border);
+    border-top:2px solid var(--gc); border-radius:14px; padding:15px; display:flex; flex-direction:column; gap:12px; cursor:pointer; }
+  html[data-ui="cubo"] .cubocard:hover { border-color:#2dd4a766; }
+  html[data-ui="cubo"] .cubocard:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  html[data-ui="cubo"] .cc-top { display:flex; align-items:flex-start; gap:11px; }
+  html[data-ui="cubo"] .cc-id { flex:1; min-width:0; }
+  html[data-ui="cubo"] .cc-name { font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  html[data-ui="cubo"] .cc-sub { display:flex; align-items:center; gap:6px; margin-top:4px; font-size:11.5px; }
+  html[data-ui="cubo"] .cc-rk { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex:0 0 auto; }
+  html[data-ui="cubo"] .cc-rank { font-size:10.5px; color:#6a7280; font-family:'IBM Plex Mono',monospace; }
+  html[data-ui="cubo"] .cc-metric { display:flex; align-items:flex-end; justify-content:space-between; }
+  html[data-ui="cubo"] .cc-big { font-family:'Space Grotesk',sans-serif; font-size:25px; font-weight:700; color:var(--accent); line-height:1; }
+  html[data-ui="cubo"] .cc-lbl { font-size:10.5px; margin-top:3px; }
+  html[data-ui="cubo"] .cc-foot { display:flex; justify-content:space-between; border-top:1px solid var(--cb-border-soft);
+    padding-top:10px; font-size:11.5px; color:var(--cb-faint); }
+  html[data-ui="cubo"] .cc-foot b { color:#cdd3dd; font-family:'IBM Plex Mono',monospace; }
+  html[data-ui="cubo"] .cubocard .trend, html[data-ui="cubo"] .cubohero .trend { font-size:12.5px; }
+  html[data-ui="cubo"] .cbempty { padding:34px; text-align:center; color:var(--cb-faint);
+    grid-column:1/-1; background:var(--cb-surface); border:1px solid var(--cb-border); border-radius:14px; }
+  html[data-ui="cubo"] .lock { font-size:11px; color:#e0a86a; }
+  /* mini-sparkline (Fase 3) */
+  html[data-ui="cubo"] .cc-spark { display:inline-block; }
+  html[data-ui="cubo"] .cbspark { width:84px; height:30px; display:block; }      /* tamanho do modelo (cartão) */
+  html[data-ui="cubo"] .ch-spark .cbspark { width:200px; height:90px; }          /* hero (modelo) */
+  html[data-ui="cubo"] .cc-metric .cc-right { display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+  html[data-ui="cubo"] .ch-spark { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  html[data-ui="cubo"] .cc-grade { font-weight:600; }   /* grade abaixo do nome, como no modelo */
+  /* respeita "reduzir movimento": desliga pulsos/flutuações (o count-up é tratado no JS) */
+  @media (prefers-reduced-motion: reduce){
+    .dot, [style*="animation"] { animation:none !important; }
+  }
+  @media (max-width:560px){
+    html[data-ui="cubo"] #cuboGrid { grid-template-columns:1fr; }
+    html[data-ui="cubo"] .cubohero { grid-template-columns:1fr; }
+    html[data-ui="cubo"] .ch-delta { align-self:flex-start; }
+  }
+
+  /* ---- Fase 2b: sidebar (nav vertical + filtros + raridade + stat) no layout Cubo ---- */
+  #cuboSidebar { display:none; }
+  html[data-ui="cubo"] nav.tabs { display:none; }   /* navegação vira vertical na sidebar */
+  html[data-ui="cubo"] body { display:grid; grid-template-columns:248px minmax(0,1fr);
+    grid-template-areas:"head head" "side main" "foot foot"; }
+  html[data-ui="cubo"] header { grid-area:head; }
+  html[data-ui="cubo"] footer { grid-area:foot; }
+  html[data-ui="cubo"] #cuboMain { grid-area:main; min-width:0; }
+  html[data-ui="cubo"] #cuboSidebar { grid-area:side; display:block; background:var(--cb-sidebar);
+    border-right:1px solid var(--cb-border-soft); padding:16px 14px;
+    position:sticky; top:0; align-self:start; overflow:visible; }   /* visible: não corta os painéis dos filtros */
+  html[data-ui="cubo"] #cbNav { display:flex; flex-direction:column; gap:3px; }
+  html[data-ui="cubo"] #cbNav button { text-align:left; background:transparent; border:1px solid transparent;
+    border-radius:9px; padding:9px 11px; color:var(--cb-muted); font-size:13.5px; cursor:pointer; }
+  html[data-ui="cubo"] #cbNav button:hover { background:#11161d; }
+  html[data-ui="cubo"] #cbNav button.on { background:#11201b; color:var(--accent); font-weight:600; }
+  html[data-ui="cubo"] .cb-sec-t { font-size:10px; text-transform:uppercase; letter-spacing:.7px;
+    color:#6a7280; margin:18px 4px 8px; }
+  html[data-ui="cubo"] #cbFilterSlot .group { display:flex; flex-direction:column; align-items:stretch;
+    gap:8px; border:0; padding:0; }
+  /* padroniza só as CAIXAS (gatilhos) da lateral via filho-direto — NÃO o conteúdo dos painéis */
+  html[data-ui="cubo"] #cbFilterSlot .dropdown { display:block; width:100%; }
+  html[data-ui="cubo"] #cbFilterSlot .ddbtn,
+  html[data-ui="cubo"] #cbFilterSlot > .group > input,
+  html[data-ui="cubo"] #cbFilterSlot > .group > select,
+  html[data-ui="cubo"] #cbFilterSlot > .group > button {
+    width:100%; height:38px; box-sizing:border-box; padding:0 11px; font-size:13px; border-radius:9px; }
+  html[data-ui="cubo"] #cbFilterSlot .ddbtn { display:flex; align-items:center; justify-content:space-between;
+    gap:8px; text-align:left; background:#11161d; border:1px solid var(--cb-border); color:var(--cb-muted); }
+  html[data-ui="cubo"] #cbFilterSlot .ddbtn.act { background:#11201b; border-color:#2dd4a755; color:var(--accent); }
+  html[data-ui="cubo"] #cbFilterSlot > .group > select { line-height:36px; }
+  html[data-ui="cubo"] #cuboSidebar #q { width:100%; height:38px; box-sizing:border-box; padding:0 11px 0 32px;
+    background-repeat:no-repeat; background-position:11px center;
+    background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='14'%20height='14'%20fill='none'%20stroke='%237e8696'%20stroke-width='2'%3E%3Ccircle%20cx='6'%20cy='6'%20r='4.5'/%3E%3Cpath%20d='M10%2010l3%203'/%3E%3C/svg%3E"); }
+  html[data-ui="cubo"] #cbFilterSlot .ddpanel { min-width:100%; }   /* painel acompanha o gatilho; checkboxes normais */
+  html[data-ui="cubo"] #cbFilterSlot .toggle { display:flex; align-items:center; justify-content:flex-start; gap:7px; }
+  html[data-ui="cubo"] #cbFilterSlot #clear { display:none; }       /* usamos o "limpar" do cabeçalho de Filtros */
+  html[data-ui="cubo"] #cbFilterSlot #resultcount { display:none; } /* contagem já aparece no card de stat */
+  html[data-ui="cubo"] .cb-rarity { display:flex; flex-wrap:wrap; gap:6px; }
+  html[data-ui="cubo"] .cb-rarity span { display:flex; align-items:center; gap:6px; font-size:11px;
+    color:var(--cb-muted); background:#11161d; border:1px solid var(--cb-border); border-radius:20px; padding:3px 9px; }
+  html[data-ui="cubo"] .cb-rarity i { width:9px; height:9px; border-radius:3px; display:inline-block; }
+  html[data-ui="cubo"] .cb-stat { margin-top:18px; background:linear-gradient(135deg,#11201b,#0e1318);
+    border:1px solid #1e2b27; border-radius:12px; padding:14px; }
+  html[data-ui="cubo"] .cb-stat .k { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:#6a7280; }
+  html[data-ui="cubo"] .cb-stat .v { font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700;
+    color:var(--accent); margin-top:6px; }
+  html[data-ui="cubo"] .cb-stat .s { font-size:11.5px; color:var(--cb-faint); margin-top:3px; }
+  /* divisórias entre seções + cabeçalho de Filtros com "limpar" (igual ao modelo) */
+  html[data-ui="cubo"] .cb-div { height:1px; background:var(--cb-border-soft); margin:16px 0; }
+  html[data-ui="cubo"] .cb-fhead { display:flex; align-items:center; justify-content:space-between; }
+  html[data-ui="cubo"] .cb-fhead .cb-sec-t { margin:18px 4px 8px; }
+  html[data-ui="cubo"] .cb-clear { background:none; border:0; color:var(--accent); font-size:11px; padding:0 4px; cursor:pointer; height:auto; }
+  html[data-ui="cubo"] .cb-clear:hover { text-decoration:underline; background:none; }
+  /* cabeçalho do site no estilo Cubo: logo ◳ + wordmark à esquerda, controles à direita */
+  html[data-ui="cubo"] header { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:14px 22px; }
+  html[data-ui="cubo"] header h1, html[data-ui="cubo"] header .chip, html[data-ui="cubo"] header #baseline { display:none; }
+  html[data-ui="cubo"] header .meta { margin-left:auto; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  html[data-ui="cubo"] .cb-brand { display:inline-flex; align-items:center; gap:12px; }
+  html[data-ui="cubo"] .cb-logo { width:36px; height:36px; flex:0 0 36px; border-radius:10px; color:#06140f;
+    display:flex; align-items:center; justify-content:center; font-size:19px;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; background:linear-gradient(135deg,#2dd4a7,#1a8d6e); }
+  html[data-ui="cubo"] .cb-brandtext { display:flex; flex-direction:column; line-height:1.2; }
+  html[data-ui="cubo"] .cb-word { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; letter-spacing:-.3px; }
+  html[data-ui="cubo"] .cb-tag { font-size:11.5px; color:var(--cb-faint); }
+  html[data-ui="cubo"] .cb-connect { background:var(--accent); color:var(--accent-ink); border-color:var(--accent);
+    font-weight:600; border-radius:9px; }
+  html[data-ui="cubo"] .cb-connect:hover:not(:disabled) { background:var(--accent); filter:brightness(1.06); }
+  /* ---- abas Efeitos e Craft no estilo Cubo ---- */
+  html[data-ui="cubo"] .gemcard, html[data-ui="cubo"] .craftcard {
+    background:var(--cb-surface); border:1px solid var(--cb-border); border-radius:14px; }
+  html[data-ui="cubo"] .gemcard:hover, html[data-ui="cubo"] .craftcard:hover { background:var(--cb-surface); border-color:#2dd4a766; }
+  html[data-ui="cubo"] .gemcard .gname { font-family:'Space Grotesk',sans-serif; color:var(--cb-text) !important; }
+  html[data-ui="cubo"] .craftcard .ctype { font-family:'Space Grotesk',sans-serif; color:var(--cb-text); }
+  html[data-ui="cubo"] .craftcard .ctier, html[data-ui="cubo"] .craftcard .clvl, html[data-ui="cubo"] .crafthint { color:var(--cb-faint); }
+  html[data-ui="cubo"] .gemcard .gsec { border-top-color:var(--cb-border-soft); }
+  html[data-ui="cubo"] .gemcard .glabel, html[data-ui="cubo"] .gemcard .gp .lbl, html[data-ui="cubo"] .craftcard .ce .lbl {
+    color:var(--cb-faint); font-family:'Figtree',sans-serif; }
+  html[data-ui="cubo"] .gemcard .gp, html[data-ui="cubo"] .craftcard .ce, html[data-ui="cubo"] .craftcard .crange { color:var(--cb-muted); }
+  html[data-ui="cubo"] .gemcard .gp b, html[data-ui="cubo"] .craftcard .ce b { color:var(--cb-text); }
+  html[data-ui="cubo"] .gemcard .gprices, html[data-ui="cubo"] .craftcard .cecon { font-family:'IBM Plex Mono',monospace; }
+  html[data-ui="cubo"] .craftcard .cmat { background:#0e131a; border-color:var(--cb-border); border-radius:8px; }
+  html[data-ui="cubo"] .craftcard .ce.win b { color:#3fbf7f; }
+  html[data-ui="cubo"] .craftcard .ce.cost b { color:#f0a93b; }
+  html[data-ui="cubo"] body.view-effects .cb-filters, html[data-ui="cubo"] body.view-effects #cbSearchSlot,
+  html[data-ui="cubo"] body.view-farm .cb-filters, html[data-ui="cubo"] body.view-farm #cbSearchSlot,
+  html[data-ui="cubo"] body.view-craft .cb-filters, html[data-ui="cubo"] body.view-craft #cbSearchSlot,
+  html[data-ui="cubo"] body.view-bag .cb-filters, html[data-ui="cubo"] body.view-bag #cbSearchSlot { display:none; }
+  @media (max-width:760px){
+    html[data-ui="cubo"] body { grid-template-columns:1fr; grid-template-areas:"head" "side" "main" "foot"; }
+    html[data-ui="cubo"] #cuboSidebar { position:static; max-height:none; border-right:0;
+      border-bottom:1px solid var(--cb-border-soft); }
+    html[data-ui="cubo"] #cbNav { flex-direction:row; flex-wrap:wrap; }
+  }
 </style></head>
 <body>
 <header>
+  <div class="cb-brand cubo-only">
+    <span class="cb-logo">◳</span>
+    <span class="cb-brandtext"><span class="cb-word">Cubo</span><span class="cb-tag">Mercado do Task Bar Hero</span></span>
+  </div>
   <h1>TBH Market Tool — Itens × Mercado Steam</h1>
   <div class="meta">
     <span class="chip" data-tip="data/hora em que o ranking (bulk) foi gerado — horário do build (UTC no GitHub Actions); veja o horário local em 'preços atualizados'">📅 bulk: __GENERATED__</span>
     <span class="chip"><span id="count">__N__</span> itens</span>
     <span id="status" aria-live="polite"><span class="dot off"></span>verificando servidor…</span>
+    <span class="seg uiswitch" id="uiSwitch" role="group" aria-label="layout do site"
+        data-tip="alterne entre o layout atual e o novo (Cubo, em validação) — sua escolha fica salva e vai no link">
+      <button type="button" data-ui="atual">Atual</button><button type="button" data-ui="cubo">Cubo<span class="beta">beta</span></button>
+    </span>
+    <button type="button" class="cb-connect cubo-only" id="cbConnect"
+        data-tip="ler o save do jogo e ver o valor da sua mochila (em desenvolvimento)">⬆ Conectar save</button>
   </div>
   <div class="meta" id="baseline" style="margin-top:6px"></div>
 </header>
@@ -1303,9 +1556,25 @@ HTML_TEMPLATE = r"""<!doctype html>
   <button id="tabEffects" class="tab" role="tab" aria-selected="false" data-tip="gemas/decorações: efeito por slot + preço">Efeitos (gemas)</button>
   <button id="tabFarm" class="tab" role="tab" aria-selected="false" data-tip="stages: onde dropam os itens (+ preço quando tradável)">Farm</button>
   <button id="tabCraft" class="tab" role="tab" aria-selected="false" data-tip="craft (receitas): custo dos reagentes × valor dos itens da pull — vale craftar ou vender os materiais?">Craft</button>
+  <button id="tabBag" class="tab" role="tab" aria-selected="false" data-tip="valor da sua mochila a partir do save do jogo — em desenvolvimento">🎒 Minha Mochila<span class="badge-new">em breve</span></button>
 </nav>
+<aside id="cuboSidebar" aria-label="navegação e filtros (layout Cubo)">
+  <div id="cbSearchSlot"></div>
+  <div class="cb-sec-t">Navegação</div>
+  <nav id="cbNav" aria-label="seções"></nav>
+  <div class="cb-div"></div>
+  <div class="cb-filters">
+    <div class="cb-fhead"><span class="cb-sec-t">Filtros</span><button type="button" id="cbClear" class="cb-clear">limpar</button></div>
+    <div id="cbFilterSlot"></div>
+  </div>
+  <div class="cb-div"></div>
+  <div class="cb-sec-t">Raridade</div>
+  <div id="cbRarity" class="cb-rarity"></div>
+  <div id="cbStat" class="cb-stat"></div>
+</aside>
+<div id="cuboMain">
 <div class="controls" id="marketControls">
-  <div class="group">
+  <div class="group" id="filterGroup">
     <input type="text" id="q" placeholder="buscar por nome..." aria-label="buscar por nome">
     <div class="dropdown" id="f_grade"></div>
     <div class="dropdown" id="f_type"></div>
@@ -1330,8 +1599,22 @@ HTML_TEMPLATE = r"""<!doctype html>
     <button id="clear" data-tip="limpa busca e todos os filtros">✕ Limpar</button>
   </div>
   <div class="group">
+    <div class="seg cubo-only" id="cuboModeSeg" role="group" aria-label="visualização"
+        data-tip="cartões ou tabela (tabela = todas as infos)">
+      <button type="button" data-m="cards">▦ Cartões</button><button type="button" data-m="table">▤ Tabela</button>
+    </div>
+    <label class="cubo-only cb-visao" data-tip="ordenar o ranking por">
+      <select id="cuboSort" aria-label="ordenar por">
+        <option value="goldPerEst">gold / moeda</option>
+        <option value="goldPerReal">preço real (gold/moeda)</option>
+        <option value="buyScore">encomenda · vender agora</option>
+        <option value="chg24">maior alta 24h</option>
+        <option value="gold">gold (cubo)</option>
+        <option value="priceEst">preço</option>
+      </select>
+    </label>
     <div class="seg" id="cur" role="group" aria-label="moeda">
-      <button data-c="usd">USD $</button><button data-c="brl" class="on">BRL R$</button>
+      <button data-c="usd">USD</button><button data-c="brl" class="on">BRL</button>
     </div>
     <label class="meta" id="rateWrap">taxa R$ <input type="number" id="rate" step="0.001"
         value="__RATE__" style="width:78px" aria-label="taxa USD para BRL"></label>
@@ -1343,6 +1626,10 @@ HTML_TEMPLATE = r"""<!doctype html>
 </div>
 <div id="activeFilters" aria-label="filtros ativos"></div>
 <div id="movers" aria-label="maiores variações de preço"></div>
+<div id="cuboView" aria-label="ranking em cartões (layout Cubo)">
+  <div id="cuboHero"></div>
+  <div id="cuboGrid"></div>
+</div>
 <div class="wrap">
 <table id="t"><thead><tr>
   <th data-k="name" tabindex="0">Item</th>
@@ -1421,6 +1708,25 @@ HTML_TEMPLATE = r"""<!doctype html>
   <p class="crafthint">Cada receita junta os <b>reagentes</b> (materiais) e sorteia 1 item da <b>pull</b> conforme as chances por grade. Comparamos o <b>custo dos reagentes</b> com o <b>valor de revenda</b> dos itens possíveis: se nada na pull supera os reagentes, o melhor é <b>vendê-los</b>. Preços de <b>venda</b> (USD) cruzados com o mercado; itens sem oferta contam como sem valor de revenda.</p>
   <div id="craftGrid"></div>
 </section>
+<section id="bagView" aria-label="minha mochila">
+  <div class="bagdev">
+    <div class="ico">🎒</div>
+    <h2>Minha Mochila — valor do seu inventário</h2>
+    <p>Conecte o save do jogo e veja o valor da sua mochila cruzado com os preços do mercado —
+       quanto vale, o que compensa vender e onde estão suas melhores oportunidades.</p>
+    <span class="devtag">🚧 em desenvolvimento</span>
+    <div>
+      <button type="button" class="connect" id="bagConnect" disabled
+        data-tip="recurso em desenvolvimento — vai ler o save localmente, sem upload">⬆ Conectar save (em breve)</button>
+    </div>
+    <ul class="road">
+      <li>① Ler o save do jogo <b>localmente no navegador</b> (privado, sem upload)</li>
+      <li>② Cruzar os itens com o ranking de preços atual</li>
+      <li>③ Mostrar valor total, melhores vendas e encomendas ativas</li>
+    </ul>
+  </div>
+</section>
+</div><!-- /#cuboMain -->
 <div id="toasts"></div>
 <div id="detailOverlay"></div>
 <aside id="detail" role="dialog" aria-modal="true" aria-label="detalhes do item" hidden></aside>
@@ -1486,7 +1792,7 @@ let rate = (typeof P.rate === "number" && P.rate>0) ? P.rate : (parseFloat($("ra
 let sortK = P.sortK || "goldPerEst";
 let sortDir = (P.sortDir===1||P.sortDir===-1) ? P.sortDir : -1;
 let page = 1;                                            // paginação da tabela do Mercado
-let pageSize = [50,100,200].includes(P.pageSize) ? P.pageSize : 50;
+let pageSize = [20,50,100,200].includes(P.pageSize) ? P.pageSize : 20;
 let realMode = P.realMode || "low";
 let showFavs = !!P.showFavs;     // filtro "só favoritos" ativo?
 let selRow = -1;                 // linha selecionada por teclado (↑/↓)
@@ -1846,16 +2152,30 @@ function currentRows(){
 
 // ---- Aba de Efeitos (gemas/decorações) --------------------------------------------------
 let curView = "market";
+// Layout Cubo (Fase 2): no Mercado, alterna entre grade de CARTÕES e a TABELA atual.
+let cuboMode = "cards";
+try{ const m=localStorage.getItem("tbh_cubomode"); if(m==="cards"||m==="table") cuboMode=m; }catch(e){}
+function isCubo(){ return document.documentElement.getAttribute("data-ui")==="cubo"; }
+// liga/desliga a classe que faz o CSS mostrar os cartões e esconder a tabela (só Cubo+Mercado+cards)
+function syncCuboMode(){
+  document.body.classList.toggle("cubo-cards", isCubo() && curView==="market" && cuboMode==="cards");
+}
 function setView(v){
   curView = v;
   document.body.classList.toggle("view-effects", v==="effects");
   document.body.classList.toggle("view-farm", v==="farm");
   document.body.classList.toggle("view-craft", v==="craft");
-  for(const [id,name] of [["tabMarket","market"],["tabEffects","effects"],["tabFarm","farm"],["tabCraft","craft"]]){
+  document.body.classList.toggle("view-bag", v==="bag");
+  for(const [id,name] of [["tabMarket","market"],["tabEffects","effects"],["tabFarm","farm"],["tabCraft","craft"],["tabBag","bag"]]){
     const on=v===name; $(id).classList.toggle("on", on); $(id).setAttribute("aria-selected", String(on)); }
   try{ localStorage.setItem("tbh_view", v); }catch(e){}
-  if(v==="effects") renderEffects(); else if(v==="farm") renderFarm(); else if(v==="craft") renderCraft(); else render();
+  syncCuboMode(); syncCuboNav();
+  if(v==="effects") renderEffects(); else if(v==="farm") renderFarm();
+  else if(v==="craft") renderCraft(); else if(v==="bag") renderBag(); else render();
 }
+// Minha Mochila: stub. A UI "em desenvolvimento" já está no HTML; aqui fica o ponto de entrada
+// para plugar o backend depois (ler save local -> cruzar com DATA -> render do valor da mochila).
+function renderBag(){ /* TODO(backend): parse do save + valor do inventário. Ver roadmap-redesign-cubo.md */ }
 function gemRows(){ return DATA.filter(d=>d.effects && d.effects.length); }
 function populateEffectFilters(){
   const gems = gemRows();
@@ -1892,7 +2212,7 @@ function gemCard(d){
   const net = d.buyNet!=null ? `<span class="gp"><span class="lbl">enc.</span> <b>${sym()}${d.buyNet.toFixed(2)}</b></span>` : "";
   const effs = d.effects.map(g=>`<div class="geff"><span class="gs">${esc(g.slot||"")} · ${esc(attrLabel(g.stat||""))}${g.chance!=null&&g.chance<1?` <span class="muted">(${Math.round(g.chance*100)}%)</span>`:""}</span><span class="gv">${esc(g.disp||"")}</span></div>`).join("");
   return `<div class="gemcard" data-name="${esc(d.name)}" tabindex="0" title="ver detalhes">
-    <div class="gh">${icon}<span class="gname" style="color:${gc}">${esc(d.name)}</span><span class="gbadge" style="color:${gc};border-color:${gc}55;background:${gc}1a">${esc(d.grade)}</span></div>
+    <div class="gh">${icon}<span class="gname" style="color:${gc}">${esc(dispName(d))}</span><span class="gbadge" style="color:${gc};border-color:${gc}55;background:${gc}1a">${esc(d.grade)}</span></div>
     <div class="gprices"><span class="gp"><span class="lbl">preço</span> <b>${price}</b></span>${net}</div>
     <div class="gsec"><span class="glabel">Efeitos</span>${effs||'<div class="meta">—</div>'}</div></div>`;
 }
@@ -2079,12 +2399,157 @@ function renderPager(total, pages, off, shown){
     for(const p of want){ if(p-prev>1) nav+=`<span class="pgap">…</span>`; nav+=`<button data-pg="${p}" class="${p===page?'cur':''}">${p}</button>`; prev=p; }
     nav+=`<button data-pg="${page+1}" ${page>=pages?'disabled':''} aria-label="próxima">›</button>`;
   }
-  const size=`<label>por página <select id="pgSize">${[50,100,200].map(n=>`<option value="${n}"${n===pageSize?' selected':''}>${n}</option>`).join("")}</select></label>`;
+  const size=`<label>por página <select id="pgSize">${[20,50,100,200].map(n=>`<option value="${n}"${n===pageSize?' selected':''}>${n}</option>`).join("")}</select></label>`;
   box.innerHTML=info+nav+size;
   box.querySelectorAll("button[data-pg]").forEach(b=> b.onclick=()=>{ const p=+b.dataset.pg; if(p>=1&&p<=pages&&p!==page){ page=p; render(); document.querySelector(".wrap")?.scrollTo?.({top:0}); } });
   $("pgSize").onchange=e=>{ pageSize=+e.target.value; page=1; savePrefs(); render(); };
 }
 
+// ---- Layout Cubo: hero "melhor negócio" + grade de cartões (Fase 2) ---------------------
+function cuboAbbr(d){
+  const s=(d.gearType||d.type||d.name||"").replace(/[^A-Za-z]/g,"");
+  return (s.slice(0,3).toUpperCase()||"·");
+}
+function cuboTile(d, gc, lg){
+  return `<span class="cbtile${lg?' lg':''}" style="background:${gc}22;border-color:${gc}33;color:${gc}">${cuboAbbr(d)}</span>`;
+}
+// tile com o ÍCONE do item (borda na cor da raridade); se a imagem faltar/falhar, mostra a abreviação
+function cuboIcon(d, gc, lg){
+  const img = d.icon ? `<img src="${ICON_BASE}${encodeURIComponent(d.icon)}.png" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'">` : "";
+  return `<span class="cbtile${lg?' lg':''}" style="background:${gc}1a;border-color:${gc}40">${img}<span class="cbabbr" style="color:${gc}">${cuboAbbr(d)}</span></span>`;
+}
+function cuboSub(d, gc){
+  const t = d.gearType ? titleCase(d.gearType) : (d.type?titleCase(d.type):"");
+  const g = d.grade ? titleCase(d.grade) : "—";
+  return `<span class="cc-dot" style="background:${gc}"></span><span class="cc-grade" style="color:${gc}">${esc(g)}</span>`
+       + `<span class="cc-mut"> · ${esc(t||"—")}${d.level!=null?" · lvl "+d.level:""}</span>`;
+}
+function cuboPrice(d){
+  if(d.gradeLock===true) return '<span class="lock">intradável</span>';
+  return d.priceEst!=null ? sym()+d.priceEst.toFixed(2) : "—";
+}
+// Fase 3 — sparklines (de HIST/api/history.json), count-up e respeito a "reduzir movimento"
+function deltaColor(d){ const c=d.chg24; return c>0?"#3fbf7f":(c<0?"#ef6b6b":"#8a93a6"); }
+function cuboSparkSvg(name, stroke, fill){
+  const s = HIST && HIST[name]; if(!s || s.length<2) return "";
+  const vs = s.map(p=>p[1]).filter(v=>v!=null); if(vs.length<2) return "";
+  const W=64,H=22, lo=Math.min(...vs), hi=Math.max(...vs), rng=(hi-lo)||1;
+  const pts = vs.map((v,i)=>{ const x=(i/(vs.length-1))*W;
+    const y=Math.max(1,Math.min(H-1, H-((v-lo)/rng)*H)); return x.toFixed(1)+","+y.toFixed(1); });
+  const line = pts.join(" "), area = line + " " + W + "," + H + " 0," + H;   // área = linha + base (modelo)
+  const poly = fill ? `<polygon points="${area}" fill="${fill}"></polygon>` : "";
+  return `<svg class="cbspark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${poly}<polyline points="${line}" fill="none" stroke="${stroke}" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg>`;
+}
+// preenche os placeholders .cc-spark depois que o feed de histórico chega (1 fetch, cacheado)
+function injectCuboSparks(){
+  document.querySelectorAll("#cuboView .cc-spark").forEach(el=>{
+    if(el.dataset.done) return;
+    el.innerHTML = cuboSparkSvg(el.dataset.name, el.dataset.color||"#8a93a6", el.dataset.fill||"");
+    el.dataset.done = "1";
+  });
+}
+const REDUCE_MOTION = (()=>{ try{ return matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){ return false; } })();
+function countUp(el, target){
+  if(REDUCE_MOTION || !el){ if(el) el.textContent=fmt(Math.round(target)); return; }
+  const dur=900, t0=performance.now();
+  function step(t){ let p=Math.min(1,(t-t0)/dur); p=1-Math.pow(1-p,3);
+    el.textContent=fmt(Math.round(target*p)); if(p<1) requestAnimationFrame(step); }
+  requestAnimationFrame(step);
+}
+let cbStatAnimated=false;
+function cuboHeroHtml(d, gc){
+  return `<div class="cubohero" data-name="${esc(d.name)}" tabindex="0" role="button"
+      aria-label="melhor negócio: ${esc(d.name)}" style="--gc:${gc}">
+    <div class="ch-main">
+      <div class="ch-badges"><span class="ch-top">★ TOP</span><span class="ch-deal">Melhor negócio agora</span></div>
+      <div class="ch-id">${cuboIcon(d,gc,true)}<div style="min-width:0">
+        <div class="ch-name">${esc(dispName(d))}</div>
+        <div class="ch-sub">${cuboSub(d,gc)}</div></div></div>
+      <div class="ch-nums">
+        <div><div class="ch-big accent">${d.goldPerEst!=null?fmtAbbr(d.goldPerEst):"—"}</div><div class="cc-lbl">gold por ${sym().trim()}</div></div>
+        <div class="ch-sep"><div class="ch-big">${fmtAbbr(d.gold)}</div><div class="cc-lbl">gold no cubo · ${cuboPrice(d)}</div></div>
+      </div>
+    </div>
+    <div class="ch-spark"><span class="cc-spark" data-name="${esc(d.name)}" data-color="#2dd4a7" data-fill="rgba(45,212,167,.14)"></span><span class="ch-delta">${trendCell(d)} · 24h</span></div>
+  </div>`;
+}
+function cuboCardHtml(d, gc, rank){
+  const liq = liqClass(liqScore(d.listings, d.vol));
+  return `<div class="cubocard" data-name="${esc(d.name)}" tabindex="0" role="button"
+      aria-label="${esc(d.name)}" style="--gc:${gc}">
+    <div class="cc-top">${cuboIcon(d,gc)}
+      <div class="cc-id"><div class="cc-name">${highlightName(dispName(d))}</div>
+        <div class="cc-sub">${cuboSub(d,gc)}</div></div>
+      <div class="cc-rk"><span class="cc-rank">#${rank}</span><span class="liq ${liq}" title="liquidez"></span></div>
+    </div>
+    <div class="cc-metric">
+      <div><div class="cc-big">${d.goldPerEst!=null?fmtAbbr(d.goldPerEst):"—"}</div><div class="cc-lbl">gold / ${sym().trim()}</div></div>
+      <div class="cc-right"><span class="cc-spark" data-name="${esc(d.name)}" data-color="${deltaColor(d)}" data-fill="${deltaColor(d)}22"></span>${trendCell(d)}</div>
+    </div>
+    <div class="cc-foot"><span>Gold <b data-tip="${fmt(d.gold)} gold">${fmtAbbr(d.gold)}</b></span><span>Preço <b>${cuboPrice(d)}</b></span></div>
+  </div>`;
+}
+function renderCuboCards(rows, maxPpr, dealCut){
+  const hero=$("cuboHero"), grid=$("cuboGrid");
+  if(!rows.length){
+    hero.innerHTML="";
+    grid.innerHTML=`<div class="cbempty">Nenhum item corresponde aos filtros.
+      <button id="clearEmpty" style="margin-left:8px">✕ Limpar filtros</button></div>`;
+    const cb=$("clearEmpty"); if(cb) cb.onclick=clearFilters;
+    if($("pager")) $("pager").innerHTML="";
+    return;
+  }
+  const pages=Math.max(1, Math.ceil(rows.length/pageSize));
+  if(page>pages) page=pages;
+  const off=(page-1)*pageSize, pageRows=rows.slice(off, off+pageSize);
+  renderPager(rows.length, pages, off, pageRows.length);
+  // hero = líder da ordenação/filtro atuais (só na 1ª página); cartões = o restante da página
+  if(page===1 && pageRows.length){
+    hero.innerHTML=cuboHeroHtml(pageRows[0], GRADE_COLORS[pageRows[0].grade]||"#9aa3b8");
+  } else hero.innerHTML="";
+  const cards=(page===1)?pageRows.slice(1):pageRows;
+  grid.innerHTML=cards.map((d,i)=>cuboCardHtml(d, GRADE_COLORS[d.grade]||"#9aa3b8", off+(page===1?2:1)+i)).join("");
+  ensureHist().then(injectCuboSparks);   // mini-sparklines (1 fetch cacheado; preenche depois)
+}
+// ---- Sidebar do Cubo (Fase 2b): nav vertical, legenda de raridade, stat, realocação de filtros ----
+const CB_NAV = [["market","◆ Ranking"],["effects","✦ Efeitos"],["farm","⛏ Farm"],["craft","⚒ Craft"],["bag","🎒 Minha Mochila"]];
+function buildCuboNav(){
+  const el=$("cbNav"); if(!el || el.dataset.built) return;
+  el.innerHTML = CB_NAV.map(([v,l])=>`<button type="button" data-view="${v}">${l}</button>`).join("");
+  el.querySelectorAll("button").forEach(b=> b.onclick=()=>setView(b.dataset.view));
+  el.dataset.built="1";
+  syncCuboNav();
+}
+function syncCuboNav(){
+  document.querySelectorAll("#cbNav button").forEach(b=>b.classList.toggle("on", b.dataset.view===curView));
+}
+function buildCuboRarity(){
+  const el=$("cbRarity"); if(!el || el.dataset.built || !DATA.length) return;
+  const present=[...new Set(DATA.map(d=>d.grade).filter(Boolean))]
+    .sort((a,b)=>(GRADE_RANK[a]??99)-(GRADE_RANK[b]??99));
+  el.innerHTML = present.map(g=>`<span><i style="background:${GRADE_COLORS[g]||'#9aa3b8'}"></i>${esc(titleCase(g))}</span>`).join("");
+  el.dataset.built="1";
+}
+function updateCuboStat(visible){
+  const el=$("cbStat"); if(!el) return;
+  el.innerHTML = `<div class="k">Itens monitorados</div><div class="v">${fmt(DATA.length)}</div>`
+    + `<div class="s">${visible!=null? fmt(visible)+" visíveis no filtro" : "mercado cruzado com a Steam"}</div>`;
+  if(!cbStatAnimated && DATA.length){ cbStatAnimated=true; countUp(el.querySelector(".v"), DATA.length); }
+}
+// move o GRUPO de filtros (busca + dropdowns + toggles) entre a barra do topo e a sidebar.
+// move o nó real (preserva os event listeners já fiados); idempotente.
+function relocateFilters(toCubo){
+  const slot=$("cbFilterSlot"), mc=$("marketControls"), grp=$("filterGroup"),
+        sslot=$("cbSearchSlot"), q=$("q");
+  if(!slot||!mc||!grp) return;
+  if(toCubo){
+    if(grp.parentElement!==slot) slot.appendChild(grp);
+    if(q && sslot && q.parentElement!==sslot) sslot.appendChild(q);        // busca no TOPO da sidebar
+  } else {
+    if(q && q.parentElement!==grp) grp.insertBefore(q, grp.firstChild);    // busca volta p/ início do grupo
+    if(grp.parentElement!==mc) mc.insertBefore(grp, mc.firstChild);
+  }
+}
 function render(){
   const rows = currentRows();
   renderMovers();
@@ -2098,11 +2563,17 @@ function render(){
     + `média <b>${fmt(mean)}</b> · mediana <b>${fmt(med)}</b> · <b>${fmt(rows.length)}</b> visíveis de ${fmt(DATA.length)}`;
   $("count").textContent = DATA.length;
   $("resultcount").textContent = `${rows.length} / ${DATA.length}`;
+  buildCuboRarity(); updateCuboStat(rows.length);   // sidebar do Cubo (no-op visual fora do Cubo)
   renderChips();
   updateHeaders();
   updateEnrichBtn(rows);
   const dealCut = med * 2;   // arbitragem: gold/moeda >= 2× a mediana do filtro = ótimo negócio
   const acols = selAttrList();   // colunas de atributo visíveis nesta render
+
+  // Layout Cubo (cartões): reusa rows/baseline/movers já computados; a tabela fica escondida.
+  if(isCubo() && curView==="market" && cuboMode!=="table"){
+    renderCuboCards(rows, maxPpr, dealCut); markSort(); return;
+  }
 
   if(!rows.length){
     tbody.innerHTML = `<tr><td class="empty" colspan="${colCount()}">
@@ -2138,7 +2609,7 @@ function render(){
       : `<span class="icon noimg"></span>`;
     const uniq = d.uniqueMod ? `<span class="uniq" data-tip="modificador único: ${esc(attrLabel(d.uniqueMod))}">✦</span> ` : "";
     const newBadge = d.isNew ? `<span class="newb" data-tip="listado no mercado a partir da reabertura">NOVO</span> ` : "";
-    const nameHtml = `<span class="itemname"${gc?` style="color:${gc}"`:""} data-tip="clique para ver detalhes">${newBadge}${uniq}${highlightName(d.name)}</span>`;
+    const nameHtml = `<span class="itemname"${gc?` style="color:${gc}"`:""} data-tip="clique para ver detalhes">${newBadge}${uniq}${highlightName(dispName(d))}</span>`;
     const steamBtn = `<a class="steam" href="${steamUrl(d.name)}" target="_blank" rel="noopener noreferrer" title="abrir listagem na Steam" aria-label="abrir na Steam">↗ Steam</a>`;
     const hasReal = d.priceReal!=null;
     const conv = hasReal && d.realConverted;   // preço veio convertido da outra moeda
@@ -2271,6 +2742,74 @@ $("tabMarket").onclick = ()=>setView("market");
 $("tabEffects").onclick = ()=>setView("effects");
 $("tabFarm").onclick = ()=>setView("farm");
 $("tabCraft").onclick = ()=>setView("craft");
+$("tabBag").onclick = ()=>setView("bag");
+
+// A/B de layout (Atual × Cubo). data-ui já foi setado no <head> (anti-flash); aqui só tratamos a
+// troca pelo usuário: aplica no <html>, persiste e reflete na URL (link compartilhável).
+function setUI(v){
+  v = (v==="cubo") ? "cubo" : "atual";
+  document.documentElement.setAttribute("data-ui", v);
+  try{ localStorage.setItem("tbh_ui", v); }catch(e){}
+  try{ const u=new URL(location.href);
+       if(v==="atual") u.searchParams.delete("ui"); else u.searchParams.set("ui", v);
+       history.replaceState(null, "", u); }catch(e){}
+  document.querySelectorAll("#uiSwitch button").forEach(b=>b.classList.toggle("on", b.dataset.ui===v));
+  relocateFilters(v==="cubo");        // filtros na sidebar (Cubo) ou na barra do topo (Atual)
+  buildCuboNav(); buildCuboRarity();
+  if(v==="cubo") applyCuboBar();   // aplica modo/ordenação salvos ao entrar no Cubo
+  syncCuboMode();
+  if(curView==="market") render(); else updateCuboStat(null);   // re-render Mercado conforme layout
+}
+(function initUISwitch(){
+  const cur = document.documentElement.getAttribute("data-ui") || "atual";
+  document.querySelectorAll("#uiSwitch button").forEach(b=>{
+    b.classList.toggle("on", b.dataset.ui===cur);
+    b.onclick = ()=>setUI(b.dataset.ui);
+  });
+})();
+// Barra do Cubo: toggle Cartões/Tabela + seletor de ordenação ao lado (como no modelo).
+const CB_SORT_ASC = new Set(["name","grade","gearType","classes"]);
+let cuboSort = "goldPerEst";
+try{ const s=localStorage.getItem("tbh_cubosort"); if(s) cuboSort=s; }catch(e){}
+function applyCuboBar(){   // reflete modo + ordenação salvos nos controles e no estado de sort
+  sortK = cuboSort; sortDir = CB_SORT_ASC.has(cuboSort) ? 1 : -1;
+  const ss=$("cuboSort"); if(ss) ss.value=cuboSort;
+  document.querySelectorAll("#cuboModeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===cuboMode));
+}
+function setCuboMode(m){
+  cuboMode = (m==="table") ? "table" : "cards";
+  try{ localStorage.setItem("tbh_cubomode", cuboMode); }catch(e){}
+  document.querySelectorAll("#cuboModeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===cuboMode));
+  syncCuboMode();
+  if(curView==="market") render();
+}
+function setCuboSort(k){
+  cuboSort = k;
+  try{ localStorage.setItem("tbh_cubosort", k); }catch(e){}
+  sortK = k; sortDir = CB_SORT_ASC.has(k) ? 1 : -1;
+  if(curView==="market") render();
+}
+(function initCuboBar(){
+  document.querySelectorAll("#cuboModeSeg button").forEach(b=>{
+    b.classList.toggle("on", b.dataset.m===cuboMode);
+    b.onclick = ()=>setCuboMode(b.dataset.m);
+  });
+  const sel=$("cuboSort"); if(sel){ sel.value=cuboSort; sel.onchange=()=>setCuboSort(sel.value); }
+  const cc=$("cbClear"); if(cc) cc.onclick=clearFilters;        // "limpar" do cabeçalho de Filtros
+  const cs=$("cbConnect"); if(cs) cs.onclick=()=>setView("bag"); // "Conectar save" -> aba Mochila
+  if(isCubo()){ sortK=cuboSort; sortDir=CB_SORT_ASC.has(cuboSort)?1:-1; }   // 1º render correto
+  buildCuboNav();
+  relocateFilters(isCubo());
+  syncCuboMode();
+})();
+// abrir detalhe ao clicar/Enter num cartão ou no hero (reusa openDetail com o item cru de DATA)
+(function wireCuboClicks(){
+  const view=$("cuboView"); if(!view) return;
+  const open = el => { const raw = el && DATA.find(x=>x.name===el.dataset.name); if(raw) openDetail(raw); };
+  view.addEventListener("click", e=>{ const el=e.target.closest("[data-name]"); if(el) open(el); });
+  view.addEventListener("keydown", e=>{ if(e.key!=="Enter"&&e.key!==" ") return;
+    const el=e.target.closest("[data-name]"); if(el){ e.preventDefault(); open(el); } });
+})();
 ["eq","eSlot","eStat","eSort"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="effects") renderEffects(); }));
 ["fq","fAct","fSort","fTrad"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="farm") renderFarm(); }));
 ["cq","cType","cVerdict","cSort"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="craft") renderCraft(); }));
@@ -2362,6 +2901,8 @@ function highlightName(name){
   if(i<0) return esc(name);
   return esc(name.slice(0,i))+"<mark>"+esc(name.slice(i,i+q.length))+"</mark>"+esc(name.slice(i+q.length));
 }
+// nome "limpo" p/ exibir (sem "(Grade) A"); cai p/ o nome de mercado se faltar
+function dispName(d){ return d.base || d.name; }
 
 // chips de filtros ativos (cada um removível)
 function renderChips(){
@@ -2468,7 +3009,7 @@ function openDetail(raw){
     <div class="dhead">
       ${iconImg}
       <div style="min-width:0">
-        <h2 style="color:${gc}">${d.uniqueMod?'✦ ':''}${esc(d.name)}</h2>
+        <h2 style="color:${gc}">${d.uniqueMod?'✦ ':''}${esc(dispName(d))}</h2>
         <span class="badge" style="color:${gc};border-color:${gc}55;background:${gc}1a">${esc(d.grade)}</span>
       </div>
       <button class="dclose" aria-label="fechar detalhes">✕</button>
@@ -2843,7 +3384,9 @@ _JS_SPLIT_MARK = "const $ = id => document.getElementById(id);"
 
 def _split_template(tmpl):
     m_css = re.search(r"<style>(.*?)</style>", tmpl, re.S)
-    m_js = re.search(r"<script>(.*)</script>", tmpl, re.S)   # guloso -> último </script>
+    # ancora no script PRINCIPAL (o que começa com `let DATA`) p/ ignorar scripts inline curtos no
+    # <head> (ex.: o theme-setter anti-flash do A/B). `.*` guloso ainda casa até o último </script>.
+    m_js = re.search(r"<script>(\nlet DATA.*)</script>", tmpl, re.S)
     js = m_js.group(1)
     i = js.index(_JS_SPLIT_MARK)
     config_js, app_js = js[:i], js[i:]                       # config (placeholders) | código estável
@@ -3437,6 +3980,12 @@ def run_server(brl_rate, port):
                 self._send(200, APP_JS, "application/javascript")
             elif u.path == "/assets/styles.css":
                 self._send(200, CSS_CONTENT, "text/css")
+            elif u.path == "/api/history.json":        # feeds estáticos (sem auth) — espelham o build público
+                self._send(200, _history_feed())
+            elif u.path == "/api/craft.json":
+                self._send(200, _craft_feed(rows_cache["rows"]))
+            elif u.path == "/api/stages.json":
+                self._send(200, _stages_feed(rows_cache["rows"]))
             elif u.path == "/api/ping":
                 if self._auth():
                     self._send(200, {"ok": True})

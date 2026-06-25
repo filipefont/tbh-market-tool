@@ -1342,6 +1342,18 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
   html[data-ui="cubo"] button:hover:not(:disabled) { background:#1a212b; }
   html[data-ui="cubo"] .seg { border-color:var(--cb-border); border-radius:9px; }
   html[data-ui="cubo"] .seg button.on { background:var(--accent); color:var(--accent-ink); }
+  /* botões com identidade antiga -> identidade Cubo (menta/âmbar) */
+  html[data-ui="cubo"] button.toggle.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  html[data-ui="cubo"] a.steam { border-color:var(--cb-border); color:var(--cb-muted); }
+  html[data-ui="cubo"] a.steam:hover { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  html[data-ui="cubo"] .fav:hover, html[data-ui="cubo"] .fav.on { color:var(--gold); }
+  html[data-ui="cubo"] #pager button.cur { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+  html[data-ui="cubo"] .fchip { background:#11161d; border-color:var(--cb-border); color:var(--cb-muted); }
+  html[data-ui="cubo"] #activeFilters { background:var(--cb-surface); border-bottom-color:var(--cb-border-soft); }
+  /* barra de controles do Mercado (moeda/ordenação/visão) alinhada à direita, como no modelo */
+  html[data-ui="cubo"] #marketControls { justify-content:flex-end; background:transparent; border-bottom:0; padding-top:14px; }
+  html[data-ui="cubo"] .cb-visao { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--cb-muted); }
+  html[data-ui="cubo"] .cb-visao select { height:36px; border-radius:9px; }
   html[data-ui="cubo"] .tab { color:var(--cb-faint); }
   html[data-ui="cubo"] .tab.on { color:var(--cb-text); background:#11201b; border-color:#2dd4a733;
     box-shadow:inset 0 -2px 0 var(--accent); font-weight:600; }
@@ -1360,6 +1372,9 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
     flex:0 0 auto; width:42px; height:42px; border-radius:11px; border:1px solid;
     font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; }
   html[data-ui="cubo"] .cbtile.lg { width:54px; height:54px; border-radius:13px; font-size:13px; }
+  html[data-ui="cubo"] .cbtile { position:relative; overflow:hidden; }
+  html[data-ui="cubo"] .cbtile img { position:absolute; inset:0; width:100%; height:100%;
+    object-fit:contain; padding:5px; image-rendering:pixelated; }   /* cobre a abreviação quando carrega */
   html[data-ui="cubo"] .cc-dot { width:8px; height:8px; border-radius:3px; display:inline-block; flex:0 0 auto; }
   html[data-ui="cubo"] .cc-mut, html[data-ui="cubo"] .cc-lbl { color:var(--cb-faint); }
   /* hero "melhor negócio agora" */
@@ -1436,9 +1451,18 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
   html[data-ui="cubo"] .cb-sec-t { font-size:10px; text-transform:uppercase; letter-spacing:.7px;
     color:#6a7280; margin:18px 4px 8px; }
   html[data-ui="cubo"] #cbFilterSlot .group { display:flex; flex-direction:column; align-items:stretch;
-    gap:7px; border:0; padding:0; }
-  html[data-ui="cubo"] #cbFilterSlot .dropdown, html[data-ui="cubo"] #cbFilterSlot input,
-  html[data-ui="cubo"] #cbFilterSlot select, html[data-ui="cubo"] #cbFilterSlot button { width:100%; }
+    gap:8px; border:0; padding:0; }
+  /* padroniza TODAS as caixas da lateral: mesma altura, largura total, alinhadas à esquerda */
+  html[data-ui="cubo"] #cbFilterSlot .dropdown { display:block; width:100%; }
+  html[data-ui="cubo"] #cbFilterSlot .ddbtn,
+  html[data-ui="cubo"] #cbFilterSlot input,
+  html[data-ui="cubo"] #cbFilterSlot select,
+  html[data-ui="cubo"] #cbFilterSlot > .group > button {
+    width:100%; height:38px; box-sizing:border-box; padding:0 11px; font-size:13px;
+    border-radius:9px; text-align:left; }
+  html[data-ui="cubo"] #cbFilterSlot .ddpanel { width:100%; min-width:0; }
+  html[data-ui="cubo"] #cbFilterSlot .toggle { display:flex; align-items:center; gap:6px; }
+  html[data-ui="cubo"] #cbFilterSlot #resultcount { display:none; }   /* contagem já aparece no card de stat */
   html[data-ui="cubo"] .cb-rarity { display:flex; flex-wrap:wrap; gap:6px; }
   html[data-ui="cubo"] .cb-rarity span { display:flex; align-items:center; gap:6px; font-size:11px;
     color:var(--cb-muted); background:#11161d; border:1px solid var(--cb-border); border-radius:20px; padding:3px 9px; }
@@ -1518,10 +1542,15 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
     <button id="clear" data-tip="limpa busca e todos os filtros">✕ Limpar</button>
   </div>
   <div class="group">
-    <div class="seg cubo-only" id="cuboModeSeg" role="group" aria-label="visualização"
-        data-tip="alternar entre cartões e tabela (só no layout Cubo)">
-      <button type="button" data-m="cards">▦ Cartões</button><button type="button" data-m="table">▤ Tabela</button>
-    </div>
+    <label class="cubo-only cb-visao" data-tip="como ver e ordenar o ranking">Visão
+      <select id="cuboVisao" aria-label="visão do ranking">
+        <option value="gpe">▦ Cartões · melhor gold / moeda</option>
+        <option value="gpr">▦ Cartões · melhor preço real</option>
+        <option value="buy">▦ Cartões · melhor p/ vender (encomenda)</option>
+        <option value="chg">▦ Cartões · maior alta 24h</option>
+        <option value="table">▤ Tabela · todas as infos</option>
+      </select>
+    </label>
     <div class="seg" id="cur" role="group" aria-label="moeda">
       <button data-c="usd">USD $</button><button data-c="brl" class="on">BRL R$</button>
     </div>
@@ -1701,7 +1730,7 @@ let rate = (typeof P.rate === "number" && P.rate>0) ? P.rate : (parseFloat($("ra
 let sortK = P.sortK || "goldPerEst";
 let sortDir = (P.sortDir===1||P.sortDir===-1) ? P.sortDir : -1;
 let page = 1;                                            // paginação da tabela do Mercado
-let pageSize = [50,100,200].includes(P.pageSize) ? P.pageSize : 50;
+let pageSize = [20,50,100,200].includes(P.pageSize) ? P.pageSize : 20;
 let realMode = P.realMode || "low";
 let showFavs = !!P.showFavs;     // filtro "só favoritos" ativo?
 let selRow = -1;                 // linha selecionada por teclado (↑/↓)
@@ -2308,7 +2337,7 @@ function renderPager(total, pages, off, shown){
     for(const p of want){ if(p-prev>1) nav+=`<span class="pgap">…</span>`; nav+=`<button data-pg="${p}" class="${p===page?'cur':''}">${p}</button>`; prev=p; }
     nav+=`<button data-pg="${page+1}" ${page>=pages?'disabled':''} aria-label="próxima">›</button>`;
   }
-  const size=`<label>por página <select id="pgSize">${[50,100,200].map(n=>`<option value="${n}"${n===pageSize?' selected':''}>${n}</option>`).join("")}</select></label>`;
+  const size=`<label>por página <select id="pgSize">${[20,50,100,200].map(n=>`<option value="${n}"${n===pageSize?' selected':''}>${n}</option>`).join("")}</select></label>`;
   box.innerHTML=info+nav+size;
   box.querySelectorAll("button[data-pg]").forEach(b=> b.onclick=()=>{ const p=+b.dataset.pg; if(p>=1&&p<=pages&&p!==page){ page=p; render(); document.querySelector(".wrap")?.scrollTo?.({top:0}); } });
   $("pgSize").onchange=e=>{ pageSize=+e.target.value; page=1; savePrefs(); render(); };
@@ -2321,6 +2350,11 @@ function cuboAbbr(d){
 }
 function cuboTile(d, gc, lg){
   return `<span class="cbtile${lg?' lg':''}" style="background:${gc}22;border-color:${gc}33;color:${gc}">${cuboAbbr(d)}</span>`;
+}
+// tile com o ÍCONE do item (borda na cor da raridade); se a imagem faltar/falhar, mostra a abreviação
+function cuboIcon(d, gc, lg){
+  const img = d.icon ? `<img src="${ICON_BASE}${encodeURIComponent(d.icon)}.png" alt="" loading="lazy" decoding="async" onerror="this.style.display='none'">` : "";
+  return `<span class="cbtile${lg?' lg':''}" style="background:${gc}1a;border-color:${gc}40">${img}<span class="cbabbr" style="color:${gc}">${cuboAbbr(d)}</span></span>`;
 }
 function cuboSub(d, gc){
   const t = d.gearType ? titleCase(d.gearType) : (d.type?titleCase(d.type):"");
@@ -2363,7 +2397,7 @@ function cuboHeroHtml(d, gc){
       aria-label="melhor negócio: ${esc(d.name)}" style="--gc:${gc}">
     <div class="ch-main">
       <div class="ch-badges"><span class="ch-top">★ TOP</span><span class="ch-deal">Melhor negócio agora</span></div>
-      <div class="ch-id">${cuboTile(d,gc,true)}<div style="min-width:0">
+      <div class="ch-id">${cuboIcon(d,gc,true)}<div style="min-width:0">
         <div class="ch-name">${esc(d.name)}</div>
         <div class="ch-sub">${cuboSub(d,gc)}</div></div></div>
       <div class="ch-nums">
@@ -2378,7 +2412,7 @@ function cuboCardHtml(d, gc, rank){
   const liq = liqClass(liqScore(d.listings, d.vol));
   return `<div class="cubocard" data-name="${esc(d.name)}" tabindex="0" role="button"
       aria-label="${esc(d.name)}" style="--gc:${gc}">
-    <div class="cc-top">${cuboTile(d,gc)}
+    <div class="cc-top">${cuboIcon(d,gc)}
       <div class="cc-id"><div class="cc-name" style="color:${gc}">${highlightName(d.name)}</div>
         <div class="cc-sub">${cuboSub(d,gc)}</div></div>
       <div class="cc-rk"><span class="cc-rank">#${rank}</span><span class="liq ${liq}" title="liquidez"></span></div>
@@ -2651,6 +2685,7 @@ function setUI(v){
   document.querySelectorAll("#uiSwitch button").forEach(b=>b.classList.toggle("on", b.dataset.ui===v));
   relocateFilters(v==="cubo");        // filtros na sidebar (Cubo) ou na barra do topo (Atual)
   buildCuboNav(); buildCuboRarity();
+  if(v==="cubo") applyVisao(cuboVisao);   // aplica modo/ordenação da Visão ao entrar no Cubo
   syncCuboMode();
   if(curView==="market") render(); else updateCuboStat(null);   // re-render Mercado conforme layout
 }
@@ -2661,21 +2696,36 @@ function setUI(v){
     b.onclick = ()=>setUI(b.dataset.ui);
   });
 })();
-// toggle Cartões/Tabela (só aparece no Cubo)
-function setCuboMode(m){
-  cuboMode = (m==="table") ? "table" : "cards";
-  try{ localStorage.setItem("tbh_cubomode", cuboMode); }catch(e){}
-  document.querySelectorAll("#cuboModeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===cuboMode));
+// Visão do Cubo: escolhe CARTÕES (ordenados por uma métrica) ou a TABELA completa ("todas as infos").
+const CB_VISAO = {
+  gpe:  {mode:"cards", k:"goldPerEst",  dir:-1},   // melhor gold / moeda
+  gpr:  {mode:"cards", k:"goldPerReal", dir:-1},   // melhor preço real
+  buy:  {mode:"cards", k:"buyScore",    dir:-1},   // melhor p/ vender (encomenda)
+  chg:  {mode:"cards", k:"chg24",       dir:-1},   // maior alta 24h
+  table:{mode:"table"}                             // tabela com todas as colunas
+};
+let cuboVisao = "gpe";
+try{ const v=localStorage.getItem("tbh_cubovisao"); if(v && CB_VISAO[v]) cuboVisao=v; }catch(e){}
+function applyVisao(v){
+  const cfg = CB_VISAO[v] || CB_VISAO.gpe;
+  cuboMode = cfg.mode;
+  if(cfg.k){ sortK=cfg.k; sortDir=cfg.dir; }
+}
+function setCuboVisao(v){
+  if(!CB_VISAO[v]) v="gpe";
+  cuboVisao=v;
+  try{ localStorage.setItem("tbh_cubovisao", v); localStorage.setItem("tbh_cubomode", CB_VISAO[v].mode); }catch(e){}
+  applyVisao(v);
+  const sel=$("cuboVisao"); if(sel) sel.value=v;
   syncCuboMode();
   if(curView==="market") render();
 }
-(function initCuboMode(){
-  document.querySelectorAll("#cuboModeSeg button").forEach(b=>{
-    b.classList.toggle("on", b.dataset.m===cuboMode);
-    b.onclick = ()=>setCuboMode(b.dataset.m);
-  });
-  buildCuboNav();                 // nav vertical da sidebar
-  relocateFilters(isCubo());      // se já abriu em ?ui=cubo, filtros já vão p/ a sidebar
+(function initCuboVisao(){
+  const sel=$("cuboVisao");
+  if(sel){ sel.value=cuboVisao; sel.onchange=()=>setCuboVisao(sel.value); }
+  if(isCubo()) applyVisao(cuboVisao);   // já abre com modo/ordem corretos no 1º render
+  buildCuboNav();                       // nav vertical da sidebar
+  relocateFilters(isCubo());            // se já abriu em ?ui=cubo, filtros vão p/ a sidebar
   syncCuboMode();
 })();
 // abrir detalhe ao clicar/Enter num cartão ou no hero (reusa openDetail com o item cru de DATA)

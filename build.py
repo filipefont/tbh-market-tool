@@ -2961,20 +2961,25 @@ ORDERBOOK_FLUSH_EVERY = 20  # salva o cache a cada N coletas (resiliência a tim
 
 
 def enrich_orderbook(rows, top_n):
-    """Coleta as encomendas (buy orders) dos itens mais líquidos (onde há demanda real).
-    `top_n <= 0` coleta TODOS os candidatos. A seleção é por nº de listagens — proxy de mercado
-    ativo. Respeita o TTL p/ não remartelar e o throttle global da Steam.
+    """Coleta as encomendas (buy orders) dos itens. `top_n <= 0` coleta TODOS os candidatos.
+    Respeita o TTL p/ não remartelar e o throttle global da Steam.
+
+    Candidato = item TRADÁVEL e NÃO travado por grade. NÃO filtramos por nº de listagens: um item
+    pode ter encomenda (buy order) com ZERO vendas — aliás é o caso mais valioso na reabertura (muita
+    demanda, ninguém vendendo; ex.: Frozen Orb (Arcana) com 645 encomendas e 0 ofertas). Como esses
+    itens não aparecem na busca de VENDAS da Steam (`listings`=0), filtrar por listagem os perdia.
+    Ordena por VALOR (gold) desc — assim os itens caros (onde estão as maiores encomendas) são
+    coletados primeiro e não ficam famintos se o passo estourar o tempo no CI.
 
     Salva o cache incrementalmente (a cada ORDERBOOK_FLUSH_EVERY itens): uma coleta longa pode
     estourar o timeout do passo do CI; sem flush, todo o progresso se perderia."""
     book = load_orderbook()
-    # só itens com listagem e NÃO travados (intradáveis não têm encomenda a coletar)
-    candidates = sorted((r for r in rows if r.get("listings") and not r.get("gradeLock")),
-                        key=lambda r: r["listings"], reverse=True)
+    candidates = sorted((r for r in rows if r.get("tradable") and not r.get("gradeLock")),
+                        key=lambda r: r.get("gold") or 0, reverse=True)
     limit = len(candidates) if top_n <= 0 else top_n
     pending, done = {}, 0  # `pending`: coletas ainda não persistidas (zera a cada flush)
     alvo = "todos" if top_n <= 0 else str(limit)
-    print(f"\n[orderbook] encomendas dos {alvo} itens mais líquidos...")
+    print(f"\n[orderbook] encomendas dos {alvo} itens (tradáveis, por valor)...")
 
     def flush():
         if pending:
@@ -2990,6 +2995,11 @@ def enrich_orderbook(rows, top_n):
         status, curkey, bk = _order_book(r["name"])
         if status != "ok":
             print(f"  - {r['name']}: {status}")
+            continue
+        # só guarda se há atividade real (encomenda OU venda). Varremos TODOS os tradáveis agora,
+        # então muitos voltam mortos (sem buy e sem sell) — guardá-los incharia o cache e contaria
+        # como "com encomenda" um item vazio. Itens só-com-encomenda (buyMax sem sellMin) são o alvo.
+        if bk.get("buyMax") is None and bk.get("sellMin") is None:
             continue
         book.setdefault(r["name"], {})[curkey] = bk
         pending.setdefault(r["name"], {})[curkey] = bk

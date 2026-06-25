@@ -43,6 +43,10 @@ ITEMS_URL = "https://www.taskbarherowiki.com/data/items.json"
 EFFECTS_URL = "https://www.taskbarherowiki.com/data/effects.json"
 STAGES_URL = "https://www.taskbarherowiki.com/data/stages.json"
 DROPS_URL = "https://www.taskbarherowiki.com/data/drops.json"
+# Receitas de craft — host DISTINTO (`taskbarhero.wiki`, ≠ `.com` dos itens), porém o keyspace
+# casa com items.json (validado 100%). `crafting` traz materiais nomeados + result.itemsByGrade
+# (pool real de itens por grade) e result.gradeOdds (prob. por grade). Ver .spec/roadmap-viabilidade.md §3.3.
+RECIPES_URL = "https://taskbarhero.wiki/data/recipes.json"
 STEAM_URL = (
     "https://steamcommunity.com/market/search/render/"
     f"?appid={APPID}&norender=1&count=100&start={{start}}"
@@ -60,6 +64,7 @@ ITEMS_CACHE = os.path.join(DATA, "items.json")
 EFFECTS_CACHE = os.path.join(DATA, "effects.json")
 STAGES_CACHE = os.path.join(DATA, "stages.json")
 DROPS_CACHE = os.path.join(DATA, "drops.json")
+RECIPES_CACHE = os.path.join(DATA, "recipes.json")  # receitas de craft (taskbarhero.wiki)
 STEAM_CACHE = os.path.join(DATA, "steam_market.json")
 ENRICHED_CACHE = os.path.join(DATA, "enriched.json")
 ORDERBOOK_CACHE = os.path.join(DATA, "orderbook.json")  # encomendas (buy orders) por item/moeda
@@ -401,6 +406,11 @@ def get_stages(refresh):
 
 def get_drops(refresh):
     return _get_cached(DROPS_URL, DROPS_CACHE, "drops", refresh)
+
+
+def get_recipes(refresh):
+    # host distinto (taskbarhero.wiki) pode recusar nosso UA no --refresh; o cache versionado cobre.
+    return _get_cached(RECIPES_URL, RECIPES_CACHE, "recipes", refresh)
 
 
 # Piso de cobertura das junções de dados estendidos (hoje 100%). Queda = a wiki mudou keyspace
@@ -1034,11 +1044,12 @@ HTML_TEMPLATE = r"""<!doctype html>
          padding:7px 14px; border-radius:8px 8px 0 0; cursor:pointer; font-size:13px; }
   .tab.on { color:#e8ebf2; background:#ffffff0d; border-color:#ffffff1f; font-weight:600;
             box-shadow:inset 0 -2px 0 var(--accent); }
-  /* alternância de view: por padrão mostra o Mercado; .view-effects / .view-farm trocam de aba */
-  #effectsView, #farmView { display:none; }
-  body.view-effects #effectsView, body.view-farm #farmView { display:block; }
+  /* alternância de view: por padrão mostra o Mercado; .view-effects / .view-farm / .view-craft trocam de aba */
+  #effectsView, #farmView, #craftView { display:none; }
+  body.view-effects #effectsView, body.view-farm #farmView, body.view-craft #craftView { display:block; }
   body.view-effects #marketControls, body.view-effects #activeFilters, body.view-effects #movers, body.view-effects .wrap, body.view-effects #pager,
-  body.view-farm #marketControls, body.view-farm #activeFilters, body.view-farm #movers, body.view-farm .wrap, body.view-farm #pager { display:none; }
+  body.view-farm #marketControls, body.view-farm #activeFilters, body.view-farm #movers, body.view-farm .wrap, body.view-farm #pager,
+  body.view-craft #marketControls, body.view-craft #activeFilters, body.view-craft #movers, body.view-craft .wrap, body.view-craft #pager { display:none; }
   /* barra de paginação */
   #pager { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:8px 20px; font-size:12px; color:#9aa3b8; }
   #pager:empty { display:none; }
@@ -1082,6 +1093,39 @@ HTML_TEMPLATE = r"""<!doctype html>
   .gemcard .geff { display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:2px 0; }
   .gemcard .geff .gs { color:#9aa3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .gemcard .geff .gv { color:var(--accent); white-space:nowrap; font-weight:600; }
+  /* aba Craft (receitas) */
+  .crafthint { padding:2px 20px 6px; margin:0; font-size:12px; color:#8b93a7; line-height:1.5; }
+  .crafthint b { color:#cdd3e0; }
+  .craftprompt { grid-column:1/-1; text-align:center; padding:48px 20px; color:#cdd3e0; font-size:15px; }
+  #craftGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:10px; padding:6px 20px 24px; }
+  .craftcard { border:1px solid #ffffff14; background:#ffffff07; border-radius:10px; padding:11px 13px; }
+  .craftcard .ch { display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+  .craftcard .ctype { font-weight:700; color:#e8ebf2; }
+  .craftcard .ctier { font-size:11px; color:#9aa3b8; }
+  .craftcard .clvl { font-size:11px; color:#8b93a7; }
+  .vbadge { margin-left:auto; font-size:10px; font-weight:700; border:1px solid; border-radius:6px; padding:2px 7px; white-space:nowrap; cursor:help; }
+  .vbadge.craft { color:#9ff0bf; border-color:#2e7d4f; background:#1c3a2a; }
+  .vbadge.gamble { color:#f4d58a; border-color:#7d6a2e; background:#3a341c; }
+  .vbadge.sell { color:#8fc9ff; border-color:#2e5a7d; background:#1c2c3a; }
+  .vbadge.unknown { color:#9aa3b8; border-color:#ffffff1f; background:#ffffff0a; }
+  .craftcard .cecon { display:flex; gap:14px; margin:6px 0; font-family:var(--font-mono); flex-wrap:wrap; }
+  .craftcard .ce { font-size:13px; color:#cdd3e0; } .craftcard .ce .lbl { font-size:10px; color:#8b93a7; font-family:system-ui; display:block; }
+  .craftcard .ce b { color:#e8ebf2; } .craftcard .ce.win b { color:#5fd38d; } .craftcard .ce.cost b { color:#e0b07a; }
+  .craftcard .crange { font-size:12px; color:#9aa3b8; margin:3px 0 6px; font-family:var(--font-mono); }
+  .craftcard .crange .pk { color:#5fd38d; } .craftcard .crange .lo { color:#c2c9da; }
+  .craftcard .csec { border-top:1px solid #ffffff14; padding-top:6px; margin-top:4px; }
+  .craftcard .clabel { display:block; font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:#8b93a7; margin-bottom:3px; }
+  .craftcard .cmats { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+  .cmat { display:inline-flex; align-items:center; gap:4px; font-size:11px; border:1px solid #ffffff14; background:#ffffff0a; border-radius:6px; padding:2px 6px; }
+  .cmat .icon.sm { width:16px; height:16px; } .cmat .cmp { color:var(--accent); font-family:var(--font-mono); } .cmat .cmp.na { color:#e07a7a; }
+  .crow { display:flex; align-items:center; gap:7px; font-size:12px; padding:3px 0; border-top:1px solid #ffffff0a; }
+  .crow .gbadge { font-size:9px; font-weight:700; border:1px solid; border-radius:5px; padding:1px 5px; white-space:nowrap; }
+  .crow .cpct { color:#8b93a7; width:42px; text-align:right; font-family:var(--font-mono); }
+  .crow .cbn { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; cursor:pointer; }
+  .crow .cbn:hover { text-decoration:underline; }
+  .crow .cbp { margin-left:auto; color:var(--accent); font-family:var(--font-mono); white-space:nowrap; }
+  .crow .cbp.beat { color:#5fd38d; font-weight:600; }
+  .crow.noprice .cpct, .crow.noprice .gbadge { opacity:.5; } .crow .cnp { margin-left:auto; color:#6b7283; font-size:11px; }
   /* faixa de "top movers" (maiores variações) — chips clicáveis */
   #movers { padding:0 20px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
   #movers:empty { display:none; }
@@ -1236,6 +1280,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   <button id="tabMarket" class="tab on" role="tab" aria-selected="true" data-tip="ranking de itens × mercado">Mercado</button>
   <button id="tabEffects" class="tab" role="tab" aria-selected="false" data-tip="gemas/decorações: efeito por slot + preço">Efeitos (gemas)</button>
   <button id="tabFarm" class="tab" role="tab" aria-selected="false" data-tip="stages: onde dropam os itens (+ preço quando tradável)">Farm</button>
+  <button id="tabCraft" class="tab" role="tab" aria-selected="false" data-tip="craft (receitas): custo dos reagentes × valor dos itens da pull — vale craftar ou vender os materiais?">Craft</button>
 </nav>
 <div class="controls" id="marketControls">
   <div class="group">
@@ -1329,6 +1374,30 @@ HTML_TEMPLATE = r"""<!doctype html>
     </div>
   </div>
   <div id="farmGrid"></div>
+</section>
+<section id="craftView" aria-label="craft / receitas">
+  <div class="controls">
+    <div class="group">
+      <input type="text" id="cq" placeholder="buscar tipo ou item..." aria-label="buscar receita por tipo ou item resultante">
+      <select id="cType" aria-label="filtrar por tipo de equipamento"><option value="">tipo: todos</option></select>
+      <select id="cVerdict" aria-label="filtrar por veredito">
+        <option value="">veredito: todos</option>
+        <option value="craft">✅ vale craftar</option>
+        <option value="gamble">🎲 aposta</option>
+        <option value="sell">💰 vender reagentes</option>
+        <option value="unknown">— sem preço</option>
+      </select>
+      <select id="cSort" aria-label="ordenar receitas">
+        <option value="margin">melhor margem (EV − custo)</option>
+        <option value="pwin">maior chance de lucro</option>
+        <option value="ceil">maior teto</option>
+        <option value="tier">tier</option>
+      </select>
+      <span class="chip" id="cCount"></span>
+    </div>
+  </div>
+  <p class="crafthint">Cada receita junta os <b>reagentes</b> (materiais) e sorteia 1 item da <b>pull</b> conforme as chances por grade. Comparamos o <b>custo dos reagentes</b> com o <b>valor de revenda</b> dos itens possíveis: se nada na pull supera os reagentes, o melhor é <b>vendê-los</b>. Preços de <b>venda</b> (USD) cruzados com o mercado; itens sem oferta contam como sem valor de revenda.</p>
+  <div id="craftGrid"></div>
 </section>
 <div id="toasts"></div>
 <div id="detailOverlay"></div>
@@ -1759,10 +1828,11 @@ function setView(v){
   curView = v;
   document.body.classList.toggle("view-effects", v==="effects");
   document.body.classList.toggle("view-farm", v==="farm");
-  for(const [id,name] of [["tabMarket","market"],["tabEffects","effects"],["tabFarm","farm"]]){
+  document.body.classList.toggle("view-craft", v==="craft");
+  for(const [id,name] of [["tabMarket","market"],["tabEffects","effects"],["tabFarm","farm"],["tabCraft","craft"]]){
     const on=v===name; $(id).classList.toggle("on", on); $(id).setAttribute("aria-selected", String(on)); }
   try{ localStorage.setItem("tbh_view", v); }catch(e){}
-  if(v==="effects") renderEffects(); else if(v==="farm") renderFarm(); else render();
+  if(v==="effects") renderEffects(); else if(v==="farm") renderFarm(); else if(v==="craft") renderCraft(); else render();
 }
 function gemRows(){ return DATA.filter(d=>d.effects && d.effects.length); }
 function populateEffectFilters(){
@@ -1863,6 +1933,97 @@ function stageCard(s, byName, fx){
   return `<div class="stagecard">
     <div class="sh"><span class="slabel">${esc(s.label||"?")}</span>${s.level!=null?`<span class="meta">Lv ${s.level}</span>`:""}<span class="sname">${esc(s.name||"")}</span>${evTag||(s.boss?`<span class="sboss">boss: ${esc(s.boss)}</span>`:"")}</div>
     ${top}${drops||'<div class="meta">sem drops</div>'}</div>`;
+}
+
+// ---- Aba Craft (receitas) --------------------------------------------------------------
+// Cada receita: reagentes (materiais) × pull (itens por grade). Veredito vem do build:
+//   craft = EV de revenda ≥ custo · gamble = teto > custo mas EV < custo · sell = nada bate o custo
+//   unknown = algum material sem preço de mercado. Preços em USD -> moeda atual pela taxa.
+let CRAFT = null;
+const TYPE_LABEL = {MainWeapon:"Arma princ.", SubWeapon:"Arma sec.", Helmet:"Elmo", Armor:"Armadura",
+  Gloves:"Luvas", Boots:"Botas", Accessory:"Acessório"};
+const VERDICT_META = {
+  craft:{cls:"craft", txt:"✅ vale craftar", tip:"o valor médio de revenda da pull é maior que o custo dos reagentes"},
+  gamble:{cls:"gamble", txt:"🎲 aposta", tip:"existe item na pull que vale mais que os reagentes, mas na média (EV) você perde — é aposta"},
+  sell:{cls:"sell", txt:"💰 venda os reagentes", tip:"nenhum item possível da pull vale mais que os reagentes — melhor vendê-los"},
+  unknown:{cls:"unknown", txt:"— sem preço", tip:"algum material não tem preço de mercado agora; não dá p/ decidir"},
+};
+async function ensureCraft(){
+  if(CRAFT===null){
+    try{ CRAFT = await (await fetch("api/craft.json",{cache:"no-cache"})).json(); }
+    catch(e){ CRAFT = []; }
+    populateCraftFilters();
+  }
+  return CRAFT;
+}
+function populateCraftFilters(){
+  if($("cType").options.length>1 || !CRAFT || !CRAFT.length) return;
+  const types=[...new Set(CRAFT.map(c=>c.type).filter(Boolean))];
+  $("cType").insertAdjacentHTML("beforeend",
+    types.map(t=>`<option value="${esc(t)}">${esc(TYPE_LABEL[t]||t)}</option>`).join(""));
+}
+async function renderCraft(){
+  const box=$("craftGrid"); if(!box) return;
+  box.innerHTML = `<div class="meta" style="padding:20px">carregando…</div>`;
+  await ensureCraft();
+  if(!CRAFT.length){
+    box.innerHTML = `<div class="craftprompt">⚙️ <b>Sem dados de craft</b><div class="meta">o feed api/craft.json não está disponível neste build</div></div>`;
+    $("cCount").textContent = ""; return;
+  }
+  const q=$("cq").value.toLowerCase(), type=$("cType").value, verd=$("cVerdict").value, sortBy=$("cSort").value;
+  const fx = cur==="brl" ? (rate>0?rate:1) : 1;   // USD -> moeda atual
+  let list = CRAFT.filter(c=>
+    (!type || c.type===type) &&
+    (!verd || c.verdict===verd) &&
+    (!q || (TYPE_LABEL[c.type]||c.type||"").toLowerCase().includes(q)
+        || (c.mats||[]).some(m=>(m.name||"").toLowerCase().includes(q))
+        || (c.grades||[]).some(g=>g.best && g.best.name.toLowerCase().includes(q))));
+  const margin = c => (c.ev!=null && c.cost!=null) ? c.ev-c.cost : -Infinity;
+  list = list.slice().sort((a,b)=>
+    sortBy==="pwin" ? (b.pWin??-1)-(a.pWin??-1)
+    : sortBy==="ceil" ? (b.ceil??-1)-(a.ceil??-1)
+    : sortBy==="tier" ? (a.tier??0)-(b.tier??0) || (a.type||"").localeCompare(b.type||"")
+    : margin(b)-margin(a));
+  $("cCount").textContent = `${list.length} receitas`;
+  box.innerHTML = list.map(c=>craftCard(c, fx)).join("") || `<div class="meta" style="padding:20px">Nenhuma receita corresponde.</div>`;
+  box.querySelectorAll(".crow.trad").forEach(el=>{
+    el.onclick=()=>{ const d=DATA.find(x=>x.name===el.dataset.name); if(d) openDetail(d); };
+  });
+}
+function craftCard(c, fx){
+  const m=VERDICT_META[c.verdict]||VERDICT_META.unknown;
+  const money = v => v==null ? "—" : sym()+(v*fx).toFixed(2);
+  // reagentes
+  const mats=(c.mats||[]).map(mt=>{
+    const icon=mt.icon?`<img class="icon sm" src="${ICON_BASE}${encodeURIComponent(mt.icon)}.png" alt="" loading="lazy" onerror="this.classList.add('noimg');this.removeAttribute('src')">`:`<span class="icon sm noimg"></span>`;
+    const pr=mt.price!=null?`<span class="cmp">${money(mt.price)}</span>`:`<span class="cmp na" title="sem preço de mercado">s/preço</span>`;
+    return `<span class="cmat">${icon}${mt.count>1?`<b>${mt.count}×</b>`:""}<span>${esc(mt.name||"?")}</span>${pr}</span>`;
+  }).join("");
+  // economia: custo · EV (revenda média) · chance de lucro
+  const econ = `<div class="cecon">
+    <span class="ce cost"><span class="lbl">reagentes</span><b>${money(c.cost)}</b></span>
+    <span class="ce"><span class="lbl">EV revenda</span><b>${money(c.ev)}</b></span>
+    <span class="ce ${c.pWin&&c.cost!=null&&c.ev>c.cost?"win":""}"><span class="lbl">chance lucro</span><b>${c.pWin!=null?Math.round(c.pWin*100)+"%":"—"}</b></span>
+  </div>`;
+  const range = (c.floor!=null||c.ceil!=null)
+    ? `<div class="crange">faixa da pull: <span class="lo">${money(c.floor)}</span> — <span class="pk">${money(c.ceil)}</span>${c.best?` <span class="muted">(teto: ${esc(c.best.grade)} ${esc(c.best.name)})</span>`:""}</div>` : "";
+  // itens da pull por grade (mostra os que têm preço; resume os sem preço)
+  const rows=(c.grades||[]).map(g=>{
+    const gc=GRADE_COLORS[g.grade]||"#9aa3b8";
+    const badge=`<span class="gbadge" style="color:${gc};border-color:${gc}55;background:${gc}1a">${esc(g.grade)}</span>`;
+    const pct=`<span class="cpct">${g.pct!=null?g.pct+"%":""}</span>`;
+    if(g.best){
+      const beat = c.cost!=null && g.best.price>c.cost;
+      const clk = g.best.mname ? ` trad" data-name="${esc(g.best.mname)}` : "";
+      return `<div class="crow${clk}" title="ver ${esc(g.best.name)}">${pct}${badge}<span class="cbn" style="color:${gc}">${esc(g.best.name)}</span><span class="cbp${beat?" beat":""}">${money(g.best.price)}${g.n>1?` <span class="muted">·${g.n} c/ preço</span>`:""}</span></div>`;
+    }
+    return `<div class="crow noprice">${pct}${badge}<span class="cbn muted">${g.ntot} ${g.ntot>1?"itens":"item"}</span><span class="cnp">sem oferta</span></div>`;
+  }).join("");
+  return `<div class="craftcard">
+    <div class="ch"><span class="ctype">${esc(TYPE_LABEL[c.type]||c.type||"?")}</span><span class="ctier">T${c.tier}</span><span class="clvl">Lv ${c.lvl&&c.lvl[0]!=null?c.lvl[0]:"?"}–${c.lvl&&c.lvl[1]!=null?c.lvl[1]:"?"}</span><span class="vbadge ${m.cls}" title="${esc(m.tip)}">${m.txt}</span></div>
+    ${econ}${range}
+    <div class="csec"><span class="clabel">Reagentes</span><div class="cmats">${mats||'<span class="meta">—</span>'}</div></div>
+    <div class="csec"><span class="clabel">Pull (melhor item por grade)</span>${rows||'<div class="meta">—</div>'}</div></div>`;
 }
 
 // Top movers: maiores altas/quedas de preço. Usa "desde a reabertura" (chgReopen) quando há dado;
@@ -2056,7 +2217,10 @@ function clearFilters(){
 
 // debounce p/ a busca (1.7)
 const debounce = (fn,ms)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
-const rerender = ()=>{ page=1; savePrefs(); syncURL(); render(); };   // filtro/ordenação muda -> volta p/ pág.1
+// filtro/ordenação/moeda muda -> volta p/ pág.1 e re-renderiza a ABA ativa (mercado/efeitos/farm/craft)
+const rerender = ()=>{ page=1; savePrefs(); syncURL();
+  if(curView==="effects") renderEffects(); else if(curView==="farm") renderFarm();
+  else if(curView==="craft") renderCraft(); else render(); };
 const rerenderDebounced = debounce(rerender, 150);
 
 function sortBy(k){
@@ -2084,12 +2248,15 @@ $("avail").addEventListener("input", rerender);
 $("tabMarket").onclick = ()=>setView("market");
 $("tabEffects").onclick = ()=>setView("effects");
 $("tabFarm").onclick = ()=>setView("farm");
+$("tabCraft").onclick = ()=>setView("craft");
 ["eq","eSlot","eStat","eSort"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="effects") renderEffects(); }));
 ["fq","fAct","fSort","fTrad"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="farm") renderFarm(); }));
+["cq","cType","cVerdict","cSort"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="craft") renderCraft(); }));
 populateEffectFilters();
 try{ const sv=localStorage.getItem("tbh_view");
   if(sv==="effects" && gemRows().length) setView("effects");
-  else if(sv==="farm") setView("farm"); }catch(e){}
+  else if(sv==="farm") setView("farm");
+  else if(sv==="craft") setView("craft"); }catch(e){}
 $("rate").addEventListener("input", ()=>{ rate=parseFloat($("rate").value)||rate; rerenderDebounced(); });
 $("clear").onclick = clearFilters;
 $("favFilter").onclick = ()=>{
@@ -2946,6 +3113,104 @@ def _stages_feed(rows=None):
     return out
 
 
+def _craft_feed(rows=None):
+    """Craft (receitas `crafting`) p/ o site: cruza os MATERIAIS (reagentes) e os ITENS-RESULTADO
+    com o mercado p/ responder 'vale craftar ou é melhor vender os reagentes?'. Modelo min–máx
+    (piso/teto da pull) + `pWin` (chance de sair um item que vale mais que os reagentes). recipes.json
+    fica SÓ no build (não vai ao front). Best-effort: vazio se faltar cache/junção.
+
+    Ressalvas: usa preço de VENDA (priceoverview, USD) — base já cruzada nas linhas. Grades sem
+    listagem (ex.: travados na reabertura, ou itens de grade baixa que ninguém anuncia) entram como
+    'sem preço'; por isso muitas pulls de grade baixa aparecem sem valor de mercado, e o veredito olha
+    o MELHOR resultado possível vs. o custo dos reagentes (exatamente o pedido)."""
+    recipes = get_recipes(False)
+    crafting = recipes.get("crafting") if isinstance(recipes, dict) else None
+    if not crafting:
+        return []
+    price_usd = {r["name"]: r["usd"] for r in (rows or []) if r.get("usd")}
+    if not price_usd:
+        return []
+    items = get_items(False)
+    by = {it.get("key"): it for it in items}
+    key2name = {it.get("key"): join_key(it) for it in items}
+
+    def price_of(k):
+        it = by.get(k)
+        if not it or not it.get("tradable"):
+            return None                       # intradável não tem preço de mercado
+        return price_usd.get(key2name.get(k))
+
+    out = []
+    for rc in crafting:
+        res = rc.get("result") or {}
+        # custo dos reagentes = Σ count × preço do material (None se algum material não tem preço)
+        mats, cost, cost_known = [], 0.0, True
+        for m in (rc.get("materials") or []):
+            it = by.get(m.get("id"))
+            cnt = m.get("count", 1)
+            pr = price_usd.get(key2name.get(m.get("id"))) if it else None
+            mats.append({"name": (m.get("name") or {}).get("en-US") or (it or {}).get("name"),
+                         "icon": (it or {}).get("icon"), "grade": m.get("grade"),
+                         "count": cnt, "price": round(pr, 2) if pr else None})
+            if pr is None:
+                cost_known = False
+            else:
+                cost += cnt * pr
+        cost = round(cost, 2) if cost_known else None
+        odds = {o.get("grade"): o.get("pct", 0) for o in (res.get("gradeOdds") or [])}
+        grades, best, floor, ceil, pwin, ev = [], None, None, None, 0.0, 0.0
+        for g, keys in (res.get("itemsByGrade") or {}).items():
+            pct = odds.get(g, 0)
+            priced = [(k, p) for k in keys if (p := price_of(k))]
+            gv = {"grade": g, "pct": pct, "n": len(priced), "ntot": len(keys),
+                  "floor": None, "ceil": None, "best": None}
+            if priced:
+                bk, bp = max(priced, key=lambda x: x[1])
+                lo = min(p for _, p in priced)
+                gv["floor"], gv["ceil"] = round(lo, 2), round(bp, 2)
+                gv["best"] = {"name": by[bk].get("name"), "icon": by[bk].get("icon"),
+                              "mname": key2name.get(bk), "price": round(bp, 2)}
+                floor = lo if floor is None else min(floor, lo)
+                ceil = bp if ceil is None else max(ceil, bp)
+                if best is None or bp > best[2]:
+                    best = (g, bk, bp)
+                # valor esperado da pull: itens sem preço (intradáveis/sem oferta) contam 0 — é o
+                # valor de REVENDA médio de 1 craft, base honesta p/ comparar com vender o reagente.
+                ev += pct / 100.0 * (sum(p for _, p in priced) / len(keys))
+                if cost_known and cost > 0:
+                    # chance de a pull dar item acima do custo: uniforme sobre TODOS os itens do grade
+                    pwin += pct / 100.0 * (sum(1 for _, p in priced if p > cost) / len(keys))
+            grades.append(gv)
+        if not cost_known:
+            verdict = "unknown"               # sem preço de material -> não dá p/ decidir
+        elif not best or best[2] <= cost:
+            verdict = "sell"                  # nada na pull bate o custo -> venda os reagentes
+        elif ev >= cost:
+            verdict = "craft"                 # positivo na média: craftar compensa
+        else:
+            verdict = "gamble"                # dá p/ tentar (teto > custo), mas na média perde (aposta)
+        out.append({
+            "type": rc.get("type"), "tier": rc.get("tier"),
+            "lvl": [res.get("levelMin"), res.get("levelMax")], "distinct": res.get("distinct"),
+            "mats": mats, "cost": cost, "odds": res.get("gradeOdds") or [], "grades": grades,
+            "floor": round(floor, 2) if floor is not None else None,
+            "ceil": round(ceil, 2) if ceil is not None else None,
+            "ev": round(ev, 2) if cost_known else None,
+            "best": ({"grade": best[0], "name": by[best[1]].get("name"),
+                      "icon": by[best[1]].get("icon"), "mname": key2name.get(best[1]),
+                      "price": round(best[2], 2)} if best else None),
+            "pWin": round(pwin, 4) if cost_known else None, "verdict": verdict,
+        })
+    # melhores oportunidades primeiro: craft (+ margem de EV), aposta, vender, sem custo
+    rank = {"craft": 0, "gamble": 1, "sell": 2, "unknown": 3}
+
+    def margin(v):
+        return (v["ev"] - v["cost"]) if (v["ev"] is not None and v["cost"] is not None) else -1.0
+
+    out.sort(key=lambda v: (rank[v["verdict"]], -margin(v), v.get("type") or "", v.get("tier") or 0))
+    return out
+
+
 def write_static(rows, brl_rate, public=False):
     rows.sort(key=lambda r: r["gold"] / r["usd"] if r["usd"] else 0, reverse=True)
     write_assets()                       # assets/styles.css + assets/app.js (cacheáveis)
@@ -2958,9 +3223,11 @@ def write_static(rows, brl_rate, public=False):
             json.dump(_history_feed(), f, ensure_ascii=False)
         with open(os.path.join(api_dir, "stages.json"), "w", encoding="utf-8") as f:
             json.dump(_stages_feed(rows), f, ensure_ascii=False)
+        with open(os.path.join(api_dir, "craft.json"), "w", encoding="utf-8") as f:
+            json.dump(_craft_feed(rows), f, ensure_ascii=False)
     out = os.path.join(HERE, "index.html")
     open(out, "w", encoding="utf-8").write(render_html(rows, brl_rate, public=public))
-    extra = " + api/{data,history,stages}.json (público)" if public else ""
+    extra = " + api/{data,history,stages,craft}.json (público)" if public else ""
     print(f"[ok] gerado: {out} + assets/{{styles.css,app.js}}{extra}")
 
 

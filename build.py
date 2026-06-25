@@ -1037,9 +1037,17 @@ HTML_TEMPLATE = r"""<!doctype html>
   /* alternância de view: por padrão mostra o Mercado; .view-effects / .view-farm trocam de aba */
   #effectsView, #farmView { display:none; }
   body.view-effects #effectsView, body.view-farm #farmView { display:block; }
-  body.view-effects #marketControls, body.view-effects #activeFilters, body.view-effects #movers, body.view-effects .wrap,
-  body.view-farm #marketControls, body.view-farm #activeFilters, body.view-farm #movers, body.view-farm .wrap { display:none; }
+  body.view-effects #marketControls, body.view-effects #activeFilters, body.view-effects #movers, body.view-effects .wrap, body.view-effects #pager,
+  body.view-farm #marketControls, body.view-farm #activeFilters, body.view-farm #movers, body.view-farm .wrap, body.view-farm #pager { display:none; }
+  /* barra de paginação */
+  #pager { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:8px 20px; font-size:12px; color:#9aa3b8; }
+  #pager:empty { display:none; }
+  #pager button { padding:4px 9px; min-width:30px; } #pager button.cur { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); font-weight:600; }
+  #pager .pgap { color:#5b6378; } #pager select { padding:4px 8px; }
+  #pager .pinfo { margin-right:auto; }
   /* cards de stage (farm) */
+  .farmprompt { grid-column:1/-1; text-align:center; padding:48px 20px; color:#cdd3e0; font-size:15px; }
+  .farmprompt .meta { margin-top:6px; }
   #farmGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px; padding:6px 20px 24px; }
   .stagecard { border:1px solid #ffffff14; background:#ffffff07; border-radius:10px; padding:10px 12px; }
   .stagecard .sh { display:flex; align-items:baseline; gap:8px; margin-bottom:6px; }
@@ -1061,12 +1069,19 @@ HTML_TEMPLATE = r"""<!doctype html>
   #effectsGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; padding:6px 20px 24px; }
   .gemcard { border:1px solid #ffffff14; background:#ffffff07; border-radius:10px; padding:10px 12px; cursor:pointer; }
   .gemcard:hover { background:#ffffff0e; }
-  .gemcard .gh { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .gemcard .gh { display:flex; align-items:center; gap:8px; }
   .gemcard .gname { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .gemcard .gprice { margin-left:auto; font-variant-numeric:tabular-nums; white-space:nowrap; }
-  .gemcard .geff { display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:2px 0; border-top:1px solid #ffffff0a; }
+  .gemcard .gbadge { margin-left:auto; font-size:10px; font-weight:600; border:1px solid; border-radius:6px; padding:1px 6px; white-space:nowrap; }
+  /* faixa de economia (preço + encomenda) em destaque, separada dos efeitos */
+  .gemcard .gprices { display:flex; gap:14px; margin:7px 0; font-family:var(--font-mono); }
+  .gemcard .gp { font-size:13px; color:#cdd3e0; } .gemcard .gp .lbl { font-size:10px; color:#8b93a7; font-family:system-ui; }
+  .gemcard .gp b { color:#e8ebf2; }
+  /* bloco "Efeitos" claramente apartado */
+  .gemcard .gsec { border-top:1px solid #ffffff14; padding-top:5px; }
+  .gemcard .glabel { display:block; font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:#8b93a7; margin-bottom:2px; }
+  .gemcard .geff { display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:2px 0; }
   .gemcard .geff .gs { color:#9aa3b8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .gemcard .geff .gv { color:#cdd3e0; white-space:nowrap; }
+  .gemcard .geff .gv { color:var(--accent); white-space:nowrap; font-weight:600; }
   /* faixa de "top movers" (maiores variações) — chips clicáveis */
   #movers { padding:0 20px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
   #movers:empty { display:none; }
@@ -1281,6 +1296,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   <th data-k="liq" tabindex="0">Disp.<span class="hint" data-tip="disponibilidade/liquidez: bolinha pela heurística (listagens + volume); 🛒 confirma ofertas reais compráveis ao vivo">ⓘ</span></th>
 </tr></thead><tbody></tbody></table>
 </div>
+<div id="pager" aria-label="paginação"></div>
 <section id="effectsView" aria-label="efeitos das gemas">
   <div class="controls">
     <div class="group">
@@ -1358,7 +1374,7 @@ function filterState(){
 }
 function savePrefs(){
   try { localStorage.setItem(LS_KEY, JSON.stringify(
-    Object.assign({ cur, rate, sortK, sortDir, realMode, auto:autoOn }, filterState())
+    Object.assign({ cur, rate, sortK, sortDir, realMode, pageSize, auto:autoOn }, filterState())
   )); } catch(e){}
 }
 // reflete o estado dos filtros na URL (compartilhável); só os que estão ativos
@@ -1378,6 +1394,8 @@ let cur = P.cur || "brl";
 let rate = (typeof P.rate === "number" && P.rate>0) ? P.rate : (parseFloat($("rate").value) || 5.4);
 let sortK = P.sortK || "goldPerEst";
 let sortDir = (P.sortDir===1||P.sortDir===-1) ? P.sortDir : -1;
+let page = 1;                                            // paginação da tabela do Mercado
+let pageSize = [50,100,200].includes(P.pageSize) ? P.pageSize : 50;
 let realMode = P.realMode || "low";
 let showFavs = !!P.showFavs;     // filtro "só favoritos" ativo?
 let selRow = -1;                 // linha selecionada por teclado (↑/↓)
@@ -1777,12 +1795,13 @@ function gemCard(d){
   const icon = d.icon
     ? `<img class="icon" src="${ICON_BASE}${encodeURIComponent(d.icon)}.png" alt="" loading="lazy" style="border-color:${gc}66" onerror="this.classList.add('noimg');this.removeAttribute('src')">`
     : `<span class="icon noimg"></span>`;
-  const price = d.priceEst!=null ? sym()+d.priceEst.toFixed(2) : '<span class="muted">—</span>';
-  const net = d.buyNet!=null ? `<div class="geff"><span class="gs">encomenda líquida</span><span class="gv">${sym()}${d.buyNet.toFixed(2)}</span></div>` : "";
-  const effs = d.effects.map(g=>`<div class="geff"><span class="gs">${esc(g.slot||"")} · ${esc(attrLabel(g.stat||""))}${g.chance!=null&&g.chance<1?` (${Math.round(g.chance*100)}%)`:""}</span><span class="gv">${esc(g.disp||"")}</span></div>`).join("");
+  const price = d.priceEst!=null ? sym()+d.priceEst.toFixed(2) : "—";
+  const net = d.buyNet!=null ? `<span class="gp"><span class="lbl">enc.</span> <b>${sym()}${d.buyNet.toFixed(2)}</b></span>` : "";
+  const effs = d.effects.map(g=>`<div class="geff"><span class="gs">${esc(g.slot||"")} · ${esc(attrLabel(g.stat||""))}${g.chance!=null&&g.chance<1?` <span class="muted">(${Math.round(g.chance*100)}%)</span>`:""}</span><span class="gv">${esc(g.disp||"")}</span></div>`).join("");
   return `<div class="gemcard" data-name="${esc(d.name)}" tabindex="0" title="ver detalhes">
-    <div class="gh">${icon}<span class="gname" style="color:${gc}">${esc(d.name)}</span><span class="gprice">${price}</span></div>
-    ${effs}${net}</div>`;
+    <div class="gh">${icon}<span class="gname" style="color:${gc}">${esc(d.name)}</span><span class="gbadge" style="color:${gc};border-color:${gc}55;background:${gc}1a">${esc(d.grade)}</span></div>
+    <div class="gprices"><span class="gp"><span class="lbl">preço</span> <b>${price}</b></span>${net}</div>
+    <div class="gsec"><span class="glabel">Efeitos</span>${effs||'<div class="meta">—</div>'}</div></div>`;
 }
 
 // ---- Aba Farm (stages) -----------------------------------------------------------------
@@ -1804,6 +1823,13 @@ async function renderFarm(){
   const box=$("farmGrid"); if(!box) return;
   box.innerHTML = `<div class="meta" style="padding:20px">carregando…</div>`;
   await ensureStages();
+  // orientada a filtro: só mostra os cards quando há busca/ato/“só tradável”. Sem isso, um prompt.
+  if(!($("fq").value.trim() || $("fAct").value || $("fTrad").checked)){
+    box.innerHTML = `<div class="farmprompt">🔍 <b>Busque um item ou escolha uma fase</b>
+      <div class="meta">para ver onde farmar, os drops e o valor por caixa</div></div>`;
+    $("fCount").textContent = "";
+    return;
+  }
   const byName = new Map(DATA.map(d=>[d.name, d]));   // cruza o drop com o item de mercado
   const q=$("fq").value.toLowerCase(), act=$("fAct").value, onlyTrad=$("fTrad").checked, sortBy=$("fSort").value;
   let stages = STAGES.filter(s=>{
@@ -1857,6 +1883,24 @@ function renderMovers(){
   box.querySelectorAll(".mvchip").forEach(b=> b.onclick=()=>{ const d=DATA.find(x=>x.name===b.dataset.name); if(d) openDetail(d); });
 }
 
+// barra de paginação da tabela do Mercado: info + números (com reticências) + tamanho por página.
+function renderPager(total, pages, off, shown){
+  const box=$("pager"); if(!box) return;
+  const info=`<span class="pinfo">mostrando <b>${total?off+1:0}–${off+shown}</b> de <b>${total}</b></span>`;
+  let nav="";
+  if(pages>1){
+    nav+=`<button data-pg="${page-1}" ${page<=1?'disabled':''} aria-label="anterior">‹</button>`;
+    const want=[...new Set([1,pages,page,page-1,page+1])].filter(p=>p>=1&&p<=pages).sort((a,b)=>a-b);
+    let prev=0;
+    for(const p of want){ if(p-prev>1) nav+=`<span class="pgap">…</span>`; nav+=`<button data-pg="${p}" class="${p===page?'cur':''}">${p}</button>`; prev=p; }
+    nav+=`<button data-pg="${page+1}" ${page>=pages?'disabled':''} aria-label="próxima">›</button>`;
+  }
+  const size=`<label>por página <select id="pgSize">${[50,100,200].map(n=>`<option value="${n}"${n===pageSize?' selected':''}>${n}</option>`).join("")}</select></label>`;
+  box.innerHTML=info+nav+size;
+  box.querySelectorAll("button[data-pg]").forEach(b=> b.onclick=()=>{ const p=+b.dataset.pg; if(p>=1&&p<=pages&&p!==page){ page=p; render(); document.querySelector(".wrap")?.scrollTo?.({top:0}); } });
+  $("pgSize").onchange=e=>{ pageSize=+e.target.value; page=1; savePrefs(); render(); };
+}
+
 function render(){
   const rows = currentRows();
   renderMovers();
@@ -1881,11 +1925,18 @@ function render(){
       Nenhum item corresponde aos filtros.
       <button id="clearEmpty" style="margin-left:8px">✕ Limpar filtros</button></td></tr>`;
     $("clearEmpty").onclick = clearFilters;
+    if($("pager")) $("pager").innerHTML = "";
     markSort();
     return;
   }
 
-  tbody.innerHTML = rows.map((d,i)=>{
+  // paginação: rendeiza só a página atual (o baseline/contagem usam o conjunto inteiro)
+  const pages = Math.max(1, Math.ceil(rows.length/pageSize));
+  if(page>pages) page=pages;
+  const off=(page-1)*pageSize, pageRows=rows.slice(off, off+pageSize);
+  renderPager(rows.length, pages, off, pageRows.length);
+  tbody.innerHTML = pageRows.map((d,gi0)=>{
+    const i = off+gi0;   // índice GLOBAL na ordenação (p/ o 🏆 do líder ficar só na 1ª página)
     // destaque do 1º lugar = primeira linha da ORDENAÇÃO/FILTRO atuais (não o máx. de gold/est)
     const first = i===0 ? " best" : "";
     const rank = i===0 ? `<span class="rank1" title="1º na ordenação atual">🏆</span> ` : "";
@@ -2004,7 +2055,7 @@ function clearFilters(){
 
 // debounce p/ a busca (1.7)
 const debounce = (fn,ms)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
-const rerender = ()=>{ savePrefs(); syncURL(); render(); };
+const rerender = ()=>{ page=1; savePrefs(); syncURL(); render(); };   // filtro/ordenação muda -> volta p/ pág.1
 const rerenderDebounced = debounce(rerender, 150);
 
 function sortBy(k){

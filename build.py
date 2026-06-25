@@ -689,6 +689,23 @@ def record_bulk_history(rows):
                     for r in rows if r.get("usd")])
 
 
+HISTORY_RETENTION_DAYS = 21   # expurgo: ~3 semanas cobrem Δ24h/7d, os gráficos e a janela de reabertura
+
+
+def prune_history():
+    """Expurga pontos antigos do histórico (price/order) p/ as tabelas não crescerem sem limite —
+    importante com a cadência de 30min. Best-effort: nunca derruba o build."""
+    cutoff = int(time.time()) - HISTORY_RETENTION_DAYS * 86400
+    try:
+        with _history_lock, sqlite3.connect(HISTORY_DB) as conn:
+            d1 = conn.execute("DELETE FROM price_history WHERE ts < ?", (cutoff,)).rowcount
+            d2 = conn.execute("DELETE FROM order_history WHERE ts < ?", (cutoff,)).rowcount
+        if d1 or d2:
+            print(f"[history] expurgo: -{d1} preço, -{d2} encomenda (> {HISTORY_RETENTION_DAYS}d)")
+    except sqlite3.Error as e:  # pragma: no cover
+        print(f"    ! expurgo do histórico falhou ({e})")
+
+
 def history_series(name, currency, since=None, limit=2000):
     """Pontos ordenados por tempo de um item/moeda. Tudo parametrizado; o chamador valida
     name/currency contra a whitelist. since (epoch s) e limit são inteiros saneados."""
@@ -1534,8 +1551,8 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
 <body>
 <header>
   <div class="cb-brand cubo-only">
-    <span class="cb-logo">◳</span>
-    <span class="cb-brandtext"><span class="cb-word">Cubo</span><span class="cb-tag">Mercado do Task Bar Hero</span></span>
+    <span class="cb-logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#06140f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg></span>
+    <span class="cb-brandtext"><span class="cb-word">TBH Market Tool</span><span class="cb-tag">Itens × Mercado Steam</span></span>
   </div>
   <h1>TBH Market Tool — Itens × Mercado Steam</h1>
   <div class="meta">
@@ -1544,7 +1561,7 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
     <span id="status" aria-live="polite"><span class="dot off"></span>verificando servidor…</span>
     <span class="seg uiswitch" id="uiSwitch" role="group" aria-label="layout do site"
         data-tip="alterne entre o layout atual e o novo (Cubo, em validação) — sua escolha fica salva e vai no link">
-      <button type="button" data-ui="atual">Atual</button><button type="button" data-ui="cubo">Cubo<span class="beta">beta</span></button>
+      <button type="button" data-ui="atual">Atual</button><button type="button" data-ui="cubo">Novo<span class="beta">beta</span></button>
     </span>
     <button type="button" class="cb-connect cubo-only" id="cbConnect"
         data-tip="ler o save do jogo e ver o valor da sua mochila (em desenvolvimento)">⬆ Conectar save</button>
@@ -1791,6 +1808,8 @@ let cur = P.cur || "brl";
 let rate = (typeof P.rate === "number" && P.rate>0) ? P.rate : (parseFloat($("rate").value) || 5.4);
 let sortK = P.sortK || "goldPerEst";
 let sortDir = (P.sortDir===1||P.sortDir===-1) ? P.sortDir : -1;
+// ordenações ligadas a ENCOMENDA: itens intradáveis (grade-lock) vão para o fim do ranking
+const BUY_SORTS = new Set(["buyNet","buyScore","buyMax","buyOrders"]);
 let page = 1;                                            // paginação da tabela do Mercado
 let pageSize = [20,50,100,200].includes(P.pageSize) ? P.pageSize : 20;
 let realMode = P.realMode || "low";
@@ -1953,21 +1972,29 @@ function makeMultiSelect({mount, label, options, selected, onChange, sortByLabel
       search.value=""; list.querySelectorAll("label").forEach(l=>l.style.display=""); empty.hidden=true; updateBtn(); } };
 }
 
-const GRADE_RANK = {}; DATA.forEach(d=>{ if(d.grade!=null && d.gradeRank!=null) GRADE_RANK[d.grade]=d.gradeRank; });
-const gradeOpts = [...new Set(DATA.map(d=>d.grade))].filter(Boolean)
-  .sort((a,b)=>(GRADE_RANK[a]??99)-(GRADE_RANK[b]??99)).map(g=>({value:g,label:g}));
-const typeOpts  = [...new Set(DATA.map(d=>d.type))].filter(Boolean).map(t=>({value:t,label:titleCase(t)}));
-const gtypeOpts = [...new Set(DATA.map(d=>d.gearType))].filter(Boolean).map(t=>({value:t,label:titleCase(t)}));
-const clsOpts   = [...new Set(DATA.flatMap(d=>d.classes||[]))].filter(Boolean).map(c=>({value:c,label:c}));
-const attrOpts  = ATTRS.map(a=>({value:a,label:attrLabel(a)}));
-
-const F = {
-  grade: makeMultiSelect({mount:"f_grade", label:"Grade",     options:gradeOpts, selected:selGrade, onChange:()=>rerender(), sortByLabel:false}),
-  type:  makeMultiSelect({mount:"f_type",  label:"Categoria", options:typeOpts,  selected:selType,  onChange:()=>rerender()}),
-  gtype: makeMultiSelect({mount:"f_gtype", label:"Tipo",      options:gtypeOpts, selected:selGType, onChange:()=>rerender()}),
-  cls:   makeMultiSelect({mount:"f_cls",   label:"Classe",    options:clsOpts,   selected:selCls,   onChange:()=>rerender()}),
-  attr:  makeMultiSelect({mount:"f_attr",  label:"Atributos", options:attrOpts,  selected:selAttrs, onChange:()=>{ syncAttrCols(); rerender(); }}),
-};
+// GRADE_RANK e os dropdowns dependem de DATA. No build público DATA começa vazio (vem por fetch),
+// então (re)construímos os filtros DEPOIS que os dados chegam — senão os filtros ficam sem opções.
+const GRADE_RANK = {};
+let F = {};
+function buildFilters(){
+  for(const k in GRADE_RANK) delete GRADE_RANK[k];
+  DATA.forEach(d=>{ if(d.grade!=null && d.gradeRank!=null) GRADE_RANK[d.grade]=d.gradeRank; });
+  const gradeOpts = [...new Set(DATA.map(d=>d.grade))].filter(Boolean)
+    .sort((a,b)=>(GRADE_RANK[a]??99)-(GRADE_RANK[b]??99)).map(g=>({value:g,label:g}));
+  const typeOpts  = [...new Set(DATA.map(d=>d.type))].filter(Boolean).map(t=>({value:t,label:titleCase(t)}));
+  const gtypeOpts = [...new Set(DATA.map(d=>d.gearType))].filter(Boolean).map(t=>({value:t,label:titleCase(t)}));
+  const clsOpts   = [...new Set(DATA.flatMap(d=>d.classes||[]))].filter(Boolean).map(c=>({value:c,label:c}));
+  const attrOpts  = ATTRS.map(a=>({value:a,label:attrLabel(a)}));
+  ["f_grade","f_type","f_gtype","f_cls","f_attr"].forEach(id=>{ const el=$(id); if(el) el.innerHTML=""; });
+  F = {
+    grade: makeMultiSelect({mount:"f_grade", label:"Grade",     options:gradeOpts, selected:selGrade, onChange:()=>rerender(), sortByLabel:false}),
+    type:  makeMultiSelect({mount:"f_type",  label:"Categoria", options:typeOpts,  selected:selType,  onChange:()=>rerender()}),
+    gtype: makeMultiSelect({mount:"f_gtype", label:"Tipo",      options:gtypeOpts, selected:selGType, onChange:()=>rerender()}),
+    cls:   makeMultiSelect({mount:"f_cls",   label:"Classe",    options:clsOpts,   selected:selCls,   onChange:()=>rerender()}),
+    attr:  makeMultiSelect({mount:"f_attr",  label:"Atributos", options:attrOpts,  selected:selAttrs, onChange:()=>{ syncAttrCols(); rerender(); }}),
+  };
+}
+buildFilters();
 
 // insere/remove as colunas de valor (uma por atributo marcado), logo após a coluna Lvl
 function syncAttrCols(){
@@ -2144,7 +2171,10 @@ function currentRows(){
     inRange(d.level, ranges.lvlMin, ranges.lvlMax) &&
     inRange(d.priceEst, ranges.priceMin, ranges.priceMax) &&
     (!showFavs||favs.has(d.name)) && availPass(d, av));
-  rows.sort((a,b)=>{ const x=sortVal(a,sortK), y=sortVal(b,sortK);
+  const buySort = BUY_SORTS.has(sortK);   // ordenações de encomenda: intradáveis vão p/ o fim
+  rows.sort((a,b)=>{
+    if(buySort){ const la=a.gradeLock?1:0, lb=b.gradeLock?1:0; if(la!==lb) return la-lb; }
+    const x=sortVal(a,sortK), y=sortVal(b,sortK);
     if(x==null) return 1; if(y==null) return -1;
     return (typeof x==="string"? x.localeCompare(y) : x-y)*sortDir; });
   return rows;
@@ -2686,6 +2716,7 @@ function markSort(){
       s.textContent=sortDir<0?" ▼":" ▲"; th.appendChild(s);
     } else { th.removeAttribute("aria-sort"); }
   });
+  if(typeof syncCuboSortSel==="function") syncCuboSortSel();   // dropdown de ordenação (Cubo) reflete o sortK
   const sn = sortK==="buyNet" && $("avail").value==="buy";
   $("sellNow").classList.toggle("on", sn);
   $("sellNow").setAttribute("aria-pressed", String(sn));
@@ -2768,13 +2799,16 @@ function setUI(v){
   });
 })();
 // Barra do Cubo: toggle Cartões/Tabela + seletor de ordenação ao lado (como no modelo).
+// O seletor REFLETE o sortK atual (persistido em prefs, junto de avail/sellNow/etc.) — não força,
+// senão sobrescreveria filtros persistentes como "Vender agora" ao recarregar a página.
 const CB_SORT_ASC = new Set(["name","grade","gearType","classes"]);
-let cuboSort = "goldPerEst";
-try{ const s=localStorage.getItem("tbh_cubosort"); if(s) cuboSort=s; }catch(e){}
-function applyCuboBar(){   // reflete modo + ordenação salvos nos controles e no estado de sort
-  sortK = cuboSort; sortDir = CB_SORT_ASC.has(cuboSort) ? 1 : -1;
-  const ss=$("cuboSort"); if(ss) ss.value=cuboSort;
+const CB_SORT_OPTS = new Set(["goldPerEst","goldPerReal","buyScore","chg24","gold","priceEst"]);
+function syncCuboSortSel(){
+  const ss=$("cuboSort"); if(ss) ss.value = CB_SORT_OPTS.has(sortK) ? sortK : "goldPerEst";
+}
+function applyCuboBar(){   // ao entrar no Cubo: reflete modo + ordenação ATUAIS (não sobrescreve)
   document.querySelectorAll("#cuboModeSeg button").forEach(b=>b.classList.toggle("on", b.dataset.m===cuboMode));
+  syncCuboSortSel();
 }
 function setCuboMode(m){
   cuboMode = (m==="table") ? "table" : "cards";
@@ -2784,9 +2818,8 @@ function setCuboMode(m){
   if(curView==="market") render();
 }
 function setCuboSort(k){
-  cuboSort = k;
-  try{ localStorage.setItem("tbh_cubosort", k); }catch(e){}
   sortK = k; sortDir = CB_SORT_ASC.has(k) ? 1 : -1;
+  savePrefs();                       // persiste sortK na MESMA fonte de avail/sellNow
   if(curView==="market") render();
 }
 (function initCuboBar(){
@@ -2794,10 +2827,10 @@ function setCuboSort(k){
     b.classList.toggle("on", b.dataset.m===cuboMode);
     b.onclick = ()=>setCuboMode(b.dataset.m);
   });
-  const sel=$("cuboSort"); if(sel){ sel.value=cuboSort; sel.onchange=()=>setCuboSort(sel.value); }
+  const sel=$("cuboSort"); if(sel) sel.onchange=()=>setCuboSort(sel.value);
+  syncCuboSortSel();
   const cc=$("cbClear"); if(cc) cc.onclick=clearFilters;        // "limpar" do cabeçalho de Filtros
   const cs=$("cbConnect"); if(cs) cs.onclick=()=>setView("bag"); // "Conectar save" -> aba Mochila
-  if(isCubo()){ sortK=cuboSort; sortDir=CB_SORT_ASC.has(cuboSort)?1:-1; }   // 1º render correto
   buildCuboNav();
   relocateFilters(isCubo());
   syncCuboMode();
@@ -3331,6 +3364,7 @@ function showLastUpdate(){
       try{ DATA = await (await fetch("api/data.json", {cache:"no-cache"})).json(); }
       catch(e){ toast("Não foi possível carregar os dados.", "error"); }
     }
+    buildFilters();           // popula os dropdowns agora que DATA chegou (estava vazio no parse)
     showLastUpdate();
     populateEffectFilters();
     render();
@@ -3343,7 +3377,7 @@ function showLastUpdate(){
     $("calib").disabled = false;
     $("refreshVisible").disabled = false;
     $("autoBtn").disabled = false;
-    const d = await api("/api/data"); if(d && d.rows){ DATA = d.rows; populateEffectFilters(); }
+    const d = await api("/api/data"); if(d && d.rows){ DATA = d.rows; buildFilters(); populateEffectFilters(); }
     if(autoOn) setAuto(true);   // retoma o auto se estava ligado na visita anterior
   }catch(e){
     $("status").innerHTML = `<span class="dot off"></span>modo estático — rode <code>python3 build.py serve</code> para atualizar preços`;
@@ -4194,6 +4228,7 @@ def main():
     rows.sort(key=lambda r: r["gold"] / r["usd"] if r["usd"] else 0, reverse=True)
     if args.refresh:
         record_bulk_history(rows)  # só registra quando o bulk é REbaixado (dado fresco)
+        prune_history()            # e expurga o histórico antigo (cap de crescimento)
     brl_rate = args.brl_rate
     if args.calibrate:
         print(f"[calibrate] amostrando {args.calibrate} itens mais líquidos...")

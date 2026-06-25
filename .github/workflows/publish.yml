@@ -52,7 +52,7 @@ jobs:
       # Se `prepare` salvasse aqui, ocuparia a chave data-${run_id} e o `finalize` não conseguiria
       # gravar a versão com as encomendas -> a próxima run restauraria dados sem order book.
       - name: Restaura dados (cache)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: data
           key: data-${{ github.run_id }}
@@ -167,7 +167,7 @@ jobs:
       # save do cache com os dados JÁ consolidados (bulk + enrich + encomendas + histórico) p/ a
       # próxima run restaurar via restore-keys "data-".
       - name: Salva dados (cache)
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: data
           key: data-${{ github.run_id }}

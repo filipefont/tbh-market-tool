@@ -974,6 +974,16 @@ HTML_TEMPLATE = r"""<!doctype html>
 <meta name="twitter:title" content="TBH Market Tool — Itens × Mercado Steam">
 <meta name="twitter:description" content="Ranking de itens do Task Bar Hero por retorno em gold e gold/R$.">
 <meta name="twitter:image" content="__SITE__/assets/og.png">
+<!-- fontes do layout "Cubo" (redesign opt-in). Só usadas quando data-ui="cubo". -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- A/B de layout: define data-ui ANTES do CSS pintar (evita flash). Atual = default; Cubo = opt-in.
+     URL ?ui=cubo|atual tem prioridade e fica salvo; senão usa o localStorage. -->
+<script>(function(){try{var u=new URLSearchParams(location.search).get("ui");
+var v=u||localStorage.getItem("tbh_ui")||"atual";if(v!=="cubo")v="atual";
+document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tbh_ui",v);
+}catch(e){document.documentElement.setAttribute("data-ui","atual");}})();</script>
 <style>
   /* Identidade "terminal de mercado": base escura, acento ESMERALDA (ticker), ouro p/ destaque,
      números em mono tabular. Cores de grade dos itens (raridade) ficam à parte. */
@@ -1067,10 +1077,11 @@ HTML_TEMPLATE = r"""<!doctype html>
   .tab.on { color:#e8ebf2; background:#ffffff0d; border-color:#ffffff1f; font-weight:600;
             box-shadow:inset 0 -2px 0 var(--accent); }
   /* alternância de view: por padrão mostra o Mercado; .view-effects / .view-farm / .view-craft trocam de aba */
-  #effectsView, #farmView, #craftView { display:none; }
-  body.view-effects #effectsView, body.view-farm #farmView, body.view-craft #craftView { display:block; }
+  #effectsView, #farmView, #craftView, #bagView { display:none; }
+  body.view-effects #effectsView, body.view-farm #farmView, body.view-craft #craftView, body.view-bag #bagView { display:block; }
   body.view-effects #marketControls, body.view-effects #activeFilters, body.view-effects #movers, body.view-effects .wrap, body.view-effects #pager,
   body.view-farm #marketControls, body.view-farm #activeFilters, body.view-farm #movers, body.view-farm .wrap, body.view-farm #pager,
+  body.view-bag #marketControls, body.view-bag #activeFilters, body.view-bag #movers, body.view-bag .wrap, body.view-bag #pager,
   body.view-craft #marketControls, body.view-craft #activeFilters, body.view-craft #movers, body.view-craft .wrap, body.view-craft #pager { display:none; }
   /* barra de paginação */
   #pager { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:8px 20px; font-size:12px; color:#9aa3b8; }
@@ -1287,6 +1298,57 @@ HTML_TEMPLATE = r"""<!doctype html>
   #detail .dactions a, #detail .dactions button { font-size:12px; }
   .spark { width:100%; height:54px; display:block; }
   .sparkwrap { background:#0f1116; border:1px solid #21242e; border-radius:8px; padding:8px; }
+  /* ===== Seletor A/B de layout (sempre visível, nos dois temas) ===== */
+  .uiswitch { margin-left:10px; vertical-align:middle; }
+  .uiswitch button { padding:4px 10px; font-size:11px; }
+  .uiswitch .beta { font-size:9px; opacity:.75; margin-left:3px; }
+  /* ===== Aba/seção "Minha Mochila" (stub — em desenvolvimento, nos dois temas) ===== */
+  .badge-new { font-size:9px; font-weight:700; color:#08130d; background:#19c37d; border-radius:10px;
+               padding:1px 6px; margin-left:5px; vertical-align:middle; }
+  #bagView { padding:46px 20px; }
+  .bagdev { max-width:580px; margin:0 auto; text-align:center; background:#161922;
+            border:1px solid #2a2e3a; border-radius:16px; padding:36px 30px; }
+  .bagdev .ico { font-size:44px; line-height:1; }
+  .bagdev h2 { margin:16px 0 8px; font-size:20px; }
+  .bagdev p { color:#9aa3b8; font-size:14px; line-height:1.55; margin:6px auto; max-width:460px; }
+  .bagdev .devtag { display:inline-block; margin-top:6px; font-size:11px; font-weight:700;
+                    color:#1c1404; background:#f4c430; border-radius:20px; padding:4px 12px; }
+  .bagdev .connect { margin-top:20px; opacity:.55; cursor:not-allowed; }
+  .bagdev .road { margin-top:20px; text-align:left; display:inline-block; color:#9aa3b8; font-size:13px; }
+  .bagdev .road li { margin:4px 0; }
+
+  /* ======================= LAYOUT "CUBO" — redesign opt-in (data-ui="cubo") =======================
+     Fase 1: re-skin (paleta menta/âmbar + fontes Space Grotesk/Figtree/IBM Plex Mono) sobre a
+     estrutura atual. Fase 2 (layout sidebar+hero+cartões) virá em cima destes tokens. */
+  html[data-ui="cubo"] {
+    --row:#11161d; --row-alt:#0e131a; --row-hover:#161d27;
+    --accent:#2dd4a7; --accent-ink:#06140f; --gold:#f0a93b;
+    --font-mono:'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+    --cb-bg:#0c0f14; --cb-surface:#11161d; --cb-sidebar:#0a0d12;
+    --cb-border:#232a35; --cb-border-soft:#1b2029; --cb-text:#eef1f5;
+    --cb-muted:#aeb6c2; --cb-faint:#7e8696;
+  }
+  html[data-ui="cubo"] body { background:var(--cb-bg); color:var(--cb-text);
+    font-family:'Figtree', system-ui, sans-serif; }
+  html[data-ui="cubo"] h1 { font-family:'Space Grotesk','Figtree',sans-serif; letter-spacing:-.3px; }
+  html[data-ui="cubo"] header { background:var(--cb-sidebar); border-bottom-color:var(--cb-border-soft); }
+  html[data-ui="cubo"] .meta { color:var(--cb-faint); }
+  html[data-ui="cubo"] .chip { background:#11161d; border-color:var(--cb-border); color:var(--cb-muted); }
+  html[data-ui="cubo"] a { color:var(--accent); }
+  html[data-ui="cubo"] .controls { background:var(--cb-surface); border-bottom-color:var(--cb-border-soft); }
+  html[data-ui="cubo"] .group + .group { border-left-color:var(--cb-border); }
+  html[data-ui="cubo"] input, html[data-ui="cubo"] select, html[data-ui="cubo"] button {
+    background:#0e131a; border-color:var(--cb-border); color:var(--cb-text); border-radius:9px; }
+  html[data-ui="cubo"] button:hover:not(:disabled) { background:#1a212b; }
+  html[data-ui="cubo"] .seg { border-color:var(--cb-border); border-radius:9px; }
+  html[data-ui="cubo"] .seg button.on { background:var(--accent); color:var(--accent-ink); }
+  html[data-ui="cubo"] .tab { color:var(--cb-faint); }
+  html[data-ui="cubo"] .tab.on { color:var(--cb-text); background:#11201b; border-color:#2dd4a733;
+    box-shadow:inset 0 -2px 0 var(--accent); font-weight:600; }
+  html[data-ui="cubo"] table { font-family:'Figtree', sans-serif; }
+  html[data-ui="cubo"] thead th { background:var(--cb-surface); color:var(--cb-faint); }
+  html[data-ui="cubo"] th, html[data-ui="cubo"] td { border-bottom-color:var(--cb-border-soft); }
+  html[data-ui="cubo"] .bagdev { background:var(--cb-surface); border-color:var(--cb-border); }
 </style></head>
 <body>
 <header>
@@ -1295,6 +1357,10 @@ HTML_TEMPLATE = r"""<!doctype html>
     <span class="chip" data-tip="data/hora em que o ranking (bulk) foi gerado — horário do build (UTC no GitHub Actions); veja o horário local em 'preços atualizados'">📅 bulk: __GENERATED__</span>
     <span class="chip"><span id="count">__N__</span> itens</span>
     <span id="status" aria-live="polite"><span class="dot off"></span>verificando servidor…</span>
+    <span class="seg uiswitch" id="uiSwitch" role="group" aria-label="layout do site"
+        data-tip="alterne entre o layout atual e o novo (Cubo, em validação) — sua escolha fica salva e vai no link">
+      <button type="button" data-ui="atual">Atual</button><button type="button" data-ui="cubo">Cubo<span class="beta">beta</span></button>
+    </span>
   </div>
   <div class="meta" id="baseline" style="margin-top:6px"></div>
 </header>
@@ -1303,6 +1369,7 @@ HTML_TEMPLATE = r"""<!doctype html>
   <button id="tabEffects" class="tab" role="tab" aria-selected="false" data-tip="gemas/decorações: efeito por slot + preço">Efeitos (gemas)</button>
   <button id="tabFarm" class="tab" role="tab" aria-selected="false" data-tip="stages: onde dropam os itens (+ preço quando tradável)">Farm</button>
   <button id="tabCraft" class="tab" role="tab" aria-selected="false" data-tip="craft (receitas): custo dos reagentes × valor dos itens da pull — vale craftar ou vender os materiais?">Craft</button>
+  <button id="tabBag" class="tab" role="tab" aria-selected="false" data-tip="valor da sua mochila a partir do save do jogo — em desenvolvimento">🎒 Minha Mochila<span class="badge-new">em breve</span></button>
 </nav>
 <div class="controls" id="marketControls">
   <div class="group">
@@ -1420,6 +1487,24 @@ HTML_TEMPLATE = r"""<!doctype html>
   </div>
   <p class="crafthint">Cada receita junta os <b>reagentes</b> (materiais) e sorteia 1 item da <b>pull</b> conforme as chances por grade. Comparamos o <b>custo dos reagentes</b> com o <b>valor de revenda</b> dos itens possíveis: se nada na pull supera os reagentes, o melhor é <b>vendê-los</b>. Preços de <b>venda</b> (USD) cruzados com o mercado; itens sem oferta contam como sem valor de revenda.</p>
   <div id="craftGrid"></div>
+</section>
+<section id="bagView" aria-label="minha mochila">
+  <div class="bagdev">
+    <div class="ico">🎒</div>
+    <h2>Minha Mochila — valor do seu inventário</h2>
+    <p>Conecte o save do jogo e veja o valor da sua mochila cruzado com os preços do mercado —
+       quanto vale, o que compensa vender e onde estão suas melhores oportunidades.</p>
+    <span class="devtag">🚧 em desenvolvimento</span>
+    <div>
+      <button type="button" class="connect" id="bagConnect" disabled
+        data-tip="recurso em desenvolvimento — vai ler o save localmente, sem upload">⬆ Conectar save (em breve)</button>
+    </div>
+    <ul class="road">
+      <li>① Ler o save do jogo <b>localmente no navegador</b> (privado, sem upload)</li>
+      <li>② Cruzar os itens com o ranking de preços atual</li>
+      <li>③ Mostrar valor total, melhores vendas e encomendas ativas</li>
+    </ul>
+  </div>
 </section>
 <div id="toasts"></div>
 <div id="detailOverlay"></div>
@@ -1851,11 +1936,16 @@ function setView(v){
   document.body.classList.toggle("view-effects", v==="effects");
   document.body.classList.toggle("view-farm", v==="farm");
   document.body.classList.toggle("view-craft", v==="craft");
-  for(const [id,name] of [["tabMarket","market"],["tabEffects","effects"],["tabFarm","farm"],["tabCraft","craft"]]){
+  document.body.classList.toggle("view-bag", v==="bag");
+  for(const [id,name] of [["tabMarket","market"],["tabEffects","effects"],["tabFarm","farm"],["tabCraft","craft"],["tabBag","bag"]]){
     const on=v===name; $(id).classList.toggle("on", on); $(id).setAttribute("aria-selected", String(on)); }
   try{ localStorage.setItem("tbh_view", v); }catch(e){}
-  if(v==="effects") renderEffects(); else if(v==="farm") renderFarm(); else if(v==="craft") renderCraft(); else render();
+  if(v==="effects") renderEffects(); else if(v==="farm") renderFarm();
+  else if(v==="craft") renderCraft(); else if(v==="bag") renderBag(); else render();
 }
+// Minha Mochila: stub. A UI "em desenvolvimento" já está no HTML; aqui fica o ponto de entrada
+// para plugar o backend depois (ler save local -> cruzar com DATA -> render do valor da mochila).
+function renderBag(){ /* TODO(backend): parse do save + valor do inventário. Ver roadmap-redesign-cubo.md */ }
 function gemRows(){ return DATA.filter(d=>d.effects && d.effects.length); }
 function populateEffectFilters(){
   const gems = gemRows();
@@ -2271,6 +2361,26 @@ $("tabMarket").onclick = ()=>setView("market");
 $("tabEffects").onclick = ()=>setView("effects");
 $("tabFarm").onclick = ()=>setView("farm");
 $("tabCraft").onclick = ()=>setView("craft");
+$("tabBag").onclick = ()=>setView("bag");
+
+// A/B de layout (Atual × Cubo). data-ui já foi setado no <head> (anti-flash); aqui só tratamos a
+// troca pelo usuário: aplica no <html>, persiste e reflete na URL (link compartilhável).
+function setUI(v){
+  v = (v==="cubo") ? "cubo" : "atual";
+  document.documentElement.setAttribute("data-ui", v);
+  try{ localStorage.setItem("tbh_ui", v); }catch(e){}
+  try{ const u=new URL(location.href);
+       if(v==="atual") u.searchParams.delete("ui"); else u.searchParams.set("ui", v);
+       history.replaceState(null, "", u); }catch(e){}
+  document.querySelectorAll("#uiSwitch button").forEach(b=>b.classList.toggle("on", b.dataset.ui===v));
+}
+(function initUISwitch(){
+  const cur = document.documentElement.getAttribute("data-ui") || "atual";
+  document.querySelectorAll("#uiSwitch button").forEach(b=>{
+    b.classList.toggle("on", b.dataset.ui===cur);
+    b.onclick = ()=>setUI(b.dataset.ui);
+  });
+})();
 ["eq","eSlot","eStat","eSort"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="effects") renderEffects(); }));
 ["fq","fAct","fSort","fTrad"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="farm") renderFarm(); }));
 ["cq","cType","cVerdict","cSort"].forEach(id=>$(id).addEventListener("input", ()=>{ if(curView==="craft") renderCraft(); }));
@@ -2843,7 +2953,9 @@ _JS_SPLIT_MARK = "const $ = id => document.getElementById(id);"
 
 def _split_template(tmpl):
     m_css = re.search(r"<style>(.*?)</style>", tmpl, re.S)
-    m_js = re.search(r"<script>(.*)</script>", tmpl, re.S)   # guloso -> último </script>
+    # ancora no script PRINCIPAL (o que começa com `let DATA`) p/ ignorar scripts inline curtos no
+    # <head> (ex.: o theme-setter anti-flash do A/B). `.*` guloso ainda casa até o último </script>.
+    m_js = re.search(r"<script>(\nlet DATA.*)</script>", tmpl, re.S)
     js = m_js.group(1)
     i = js.index(_JS_SPLIT_MARK)
     config_js, app_js = js[:i], js[i:]                       # config (placeholders) | código estável

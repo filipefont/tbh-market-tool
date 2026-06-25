@@ -44,8 +44,11 @@ if os.path.exists(idx):
         if os.path.exists(feed):
             rows = json.load(open(feed, encoding="utf-8"))
             check(isinstance(rows, list) and len(rows) > 0, "api/data.json vazio")
-    check('src="assets/app.js"' in html or "function render(" in html,
+    check('src="assets/app.js' in html or "function render(" in html,
           "index.html não referencia o app.js externo")
+    # cache-busting: a referência ao app.js deve carregar ?v=<hash> (evita asset velho em cache)
+    check('src="assets/app.js?v=' in html or "function render(" in html,
+          "index.html sem cache-busting (?v=) no app.js")
 
 # 2) modo SERVIDOR mantém os controles
 srv = build.render_html([], 5.4, token="x", public=False)

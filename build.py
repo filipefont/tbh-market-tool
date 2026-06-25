@@ -756,7 +756,8 @@ def _item_attrs(it):
 def _row_from_item(it, name, usd, listings, enriched, book=None):
     """Monta uma linha. usd=None => item sem preço do bulk (marcado noBulk)."""
     row = {
-        "name": name,
+        "name": name,                       # nome de mercado (com grade/variante) — chave p/ Steam/fav/histórico
+        "base": it.get("name") or name,     # nome "limpo" p/ exibir (sem "(Grade) A")
         "type": it["type"],
         "grade": it.get("grade"),
         "gradeRank": it.get("gradeRank"),   # 0..9 p/ ordenar grade por raridade
@@ -791,6 +792,8 @@ def _row_from_item(it, name, usd, listings, enriched, book=None):
 
 
 def build_rows(items, steam, enriched=None, book=None):
+    # itens variante "B" não são mais vendáveis no mercado -> fora das consultas e levantamentos.
+    items = [it for it in items if (it.get("variant") or "A") != "B"]
     by_key = {}
     for it in items:
         by_key.setdefault(join_key(it), it)
@@ -1594,7 +1597,7 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
       </select>
     </label>
     <div class="seg" id="cur" role="group" aria-label="moeda">
-      <button data-c="usd">USD $</button><button data-c="brl" class="on">BRL R$</button>
+      <button data-c="usd">USD</button><button data-c="brl" class="on">BRL</button>
     </div>
     <label class="meta" id="rateWrap">taxa R$ <input type="number" id="rate" step="0.001"
         value="__RATE__" style="width:78px" aria-label="taxa USD para BRL"></label>
@@ -2192,7 +2195,7 @@ function gemCard(d){
   const net = d.buyNet!=null ? `<span class="gp"><span class="lbl">enc.</span> <b>${sym()}${d.buyNet.toFixed(2)}</b></span>` : "";
   const effs = d.effects.map(g=>`<div class="geff"><span class="gs">${esc(g.slot||"")} · ${esc(attrLabel(g.stat||""))}${g.chance!=null&&g.chance<1?` <span class="muted">(${Math.round(g.chance*100)}%)</span>`:""}</span><span class="gv">${esc(g.disp||"")}</span></div>`).join("");
   return `<div class="gemcard" data-name="${esc(d.name)}" tabindex="0" title="ver detalhes">
-    <div class="gh">${icon}<span class="gname" style="color:${gc}">${esc(d.name)}</span><span class="gbadge" style="color:${gc};border-color:${gc}55;background:${gc}1a">${esc(d.grade)}</span></div>
+    <div class="gh">${icon}<span class="gname" style="color:${gc}">${esc(dispName(d))}</span><span class="gbadge" style="color:${gc};border-color:${gc}55;background:${gc}1a">${esc(d.grade)}</span></div>
     <div class="gprices"><span class="gp"><span class="lbl">preço</span> <b>${price}</b></span>${net}</div>
     <div class="gsec"><span class="glabel">Efeitos</span>${effs||'<div class="meta">—</div>'}</div></div>`;
 }
@@ -2440,7 +2443,7 @@ function cuboHeroHtml(d, gc){
     <div class="ch-main">
       <div class="ch-badges"><span class="ch-top">★ TOP</span><span class="ch-deal">Melhor negócio agora</span></div>
       <div class="ch-id">${cuboIcon(d,gc,true)}<div style="min-width:0">
-        <div class="ch-name">${esc(d.name)}</div>
+        <div class="ch-name">${esc(dispName(d))}</div>
         <div class="ch-sub">${cuboSub(d,gc)}</div></div></div>
       <div class="ch-nums">
         <div><div class="ch-big accent">${d.goldPerEst!=null?fmtAbbr(d.goldPerEst):"—"}</div><div class="cc-lbl">gold por ${sym().trim()}</div></div>
@@ -2455,7 +2458,7 @@ function cuboCardHtml(d, gc, rank){
   return `<div class="cubocard" data-name="${esc(d.name)}" tabindex="0" role="button"
       aria-label="${esc(d.name)}" style="--gc:${gc}">
     <div class="cc-top">${cuboIcon(d,gc)}
-      <div class="cc-id"><div class="cc-name" style="color:${gc}">${highlightName(d.name)}</div>
+      <div class="cc-id"><div class="cc-name" style="color:${gc}">${highlightName(dispName(d))}</div>
         <div class="cc-sub">${cuboSub(d,gc)}</div></div>
       <div class="cc-rk"><span class="cc-rank">#${rank}</span><span class="liq ${liq}" title="liquidez"></span></div>
     </div>
@@ -2586,7 +2589,7 @@ function render(){
       : `<span class="icon noimg"></span>`;
     const uniq = d.uniqueMod ? `<span class="uniq" data-tip="modificador único: ${esc(attrLabel(d.uniqueMod))}">✦</span> ` : "";
     const newBadge = d.isNew ? `<span class="newb" data-tip="listado no mercado a partir da reabertura">NOVO</span> ` : "";
-    const nameHtml = `<span class="itemname"${gc?` style="color:${gc}"`:""} data-tip="clique para ver detalhes">${newBadge}${uniq}${highlightName(d.name)}</span>`;
+    const nameHtml = `<span class="itemname"${gc?` style="color:${gc}"`:""} data-tip="clique para ver detalhes">${newBadge}${uniq}${highlightName(dispName(d))}</span>`;
     const steamBtn = `<a class="steam" href="${steamUrl(d.name)}" target="_blank" rel="noopener noreferrer" title="abrir listagem na Steam" aria-label="abrir na Steam">↗ Steam</a>`;
     const hasReal = d.priceReal!=null;
     const conv = hasReal && d.realConverted;   // preço veio convertido da outra moeda
@@ -2878,6 +2881,8 @@ function highlightName(name){
   if(i<0) return esc(name);
   return esc(name.slice(0,i))+"<mark>"+esc(name.slice(i,i+q.length))+"</mark>"+esc(name.slice(i+q.length));
 }
+// nome "limpo" p/ exibir (sem "(Grade) A"); cai p/ o nome de mercado se faltar
+function dispName(d){ return d.base || d.name; }
 
 // chips de filtros ativos (cada um removível)
 function renderChips(){
@@ -2984,7 +2989,7 @@ function openDetail(raw){
     <div class="dhead">
       ${iconImg}
       <div style="min-width:0">
-        <h2 style="color:${gc}">${d.uniqueMod?'✦ ':''}${esc(d.name)}</h2>
+        <h2 style="color:${gc}">${d.uniqueMod?'✦ ':''}${esc(dispName(d))}</h2>
         <span class="badge" style="color:${gc};border-color:${gc}55;background:${gc}1a">${esc(d.grade)}</span>
       </div>
       <button class="dclose" aria-label="fechar detalhes">✕</button>
@@ -3955,6 +3960,8 @@ def run_server(brl_rate, port):
                 self._send(200, APP_JS, "application/javascript")
             elif u.path == "/assets/styles.css":
                 self._send(200, CSS_CONTENT, "text/css")
+            elif u.path == "/api/history.json":        # feed estático do histórico (sem auth) p/ os sparklines do Cubo
+                self._send(200, _history_feed())
             elif u.path == "/api/ping":
                 if self._auth():
                     self._send(200, {"ok": True})

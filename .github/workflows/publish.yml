@@ -133,10 +133,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Node só p/ validar a sintaxe do app.js gerado (rede de segurança contra erro de JS no deploy).
+      # Node p/ validar o app.js legado (node --check) E buildar o front novo (Astro) em /next/.
+      # Astro exige Node >=22.12; o cache acelera o `npm ci` do web/.
       - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
 
       - name: Baixa dados-base
         uses: actions/download-artifact@v7
@@ -181,6 +184,23 @@ jobs:
           cp assets/styles.css _site/assets/styles.css
           cp assets/app.js _site/assets/app.js
           cp api/*.json _site/api/
+
+      # ── Front novo (Etapa 4): builda o Astro e publica em /next/ junto do legado ──────────────
+      # continue-on-error: um /next/ quebrado NUNCA pode derrubar o deploy do site legado (que é o
+      # que está no ar). Se o build falhar, o passo de cópia é pulado e só o legado vai pro Pages.
+      - name: Build do front novo (Astro -> /next/)
+        id: astro
+        continue-on-error: true
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Inclui /next/ no artefato do Pages
+        if: steps.astro.outcome == 'success'
+        run: |
+          mkdir -p _site/next
+          cp -r web/dist/. _site/next/
 
       # rasteriza o card OG (SVG -> PNG) para preview ao compartilhar o link
       - name: Gera imagem OG (best-effort)

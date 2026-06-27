@@ -1,0 +1,57 @@
+name: Web CI (Astro)
+
+# Rede de segurança da migração (Etapa 4): type-check + testes do front novo (web/).
+# Roda só quando algo em web/ (ou este workflow) muda — não interfere no pipeline de dados.
+on:
+  push:
+    paths:
+      - "web/**"
+      - ".github/workflows/web-ci.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - ".github/workflows/web-ci.yml"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instala dependências
+        run: npm ci
+
+      - name: Type-check (astro check)
+        run: npm run check
+
+      - name: Testes unitários (Vitest)
+        run: npm test
+
+      # --with-deps traz as libs de sistema do Chromium (libnspr4 etc.) no runner.
+      - name: Instala Chromium (Playwright)
+        run: npx playwright install --with-deps chromium
+
+      - name: Testes E2E (Playwright)
+        run: npm run test:e2e
+
+      - name: Sobe relatório do Playwright (em falha)
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7

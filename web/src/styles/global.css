@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Tokens da identidade "Cubo" (portados de assets/styles.css do front legado).
+   Fonte da verdade do tema durante a migração (Etapa 4). Vira o design system
+   v2 na Fase 1. Esmeralda/menta + âmbar + mono "terminal".
+   ────────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* superfícies / linhas da tabela densa */
+  --color-base: #0e1014;
+  --color-row: #0e1014;
+  --color-row-alt: #161922;
+  --color-row-hover: #1c2029;
+  --color-surface: #1b1e26;
+  --color-field: #0f1116;
+
+  /* esmeralda / menta (ação, destaque, foco) */
+  --color-accent: #19c37d;
+  --color-accent-ink: #08130d;
+  --color-accent-bright: #2bd48f;
+  --color-link: #4fd1a5;
+
+  /* âmbar / "melhor negócio" */
+  --color-gold: #f4c430;
+  --color-gold-bg: #2c2710;
+
+  /* texto */
+  --color-ink: #e6e8ee;
+  --color-muted: #9aa3b8;
+  --color-hint: #5b6378;
+
+  /* bordas */
+  --color-line: #2a2e3a;
+  --color-line-soft: #21242e;
+
+  /* tipografia */
+  --font-sans: system-ui, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-base);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  margin: 0;
+}
+
+/* números (preços, gold, Δ) em mono tabular — reforça o ar de "terminal" */
+.tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}

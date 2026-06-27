@@ -21,9 +21,10 @@ on:
   push:
     branches: [main]
   schedule:
-    # JANELA DE REABERTURA: cadência de 1h p/ capturar a formação de preço/encomenda.
-    # REVERTER p/ "0 */2 * * *" quando a volatilidade baixar. Ver .spec/roadmap-d25-reabertura.md.
-    - cron: "*/30 * * * *"   # a cada 30 min (o pipeline sharded roda em ~25min). REVERTER p/ "0 */2 * * *" quando a volatilidade baixar.
+    # Pós-reabertura: cadência estável de 1h. O pipeline sharded roda em ~25min, então 1h mantém
+    # os preços/encomendas frescos bem abaixo das 2h do plano antigo, sem pressionar a API da Steam.
+    # Se a volatilidade exigir, dá p/ apertar (ex.: */30); se ficar calmo, afrouxar p/ 2h.
+    - cron: "0 * * * *"   # de hora em hora
   workflow_dispatch:
 
 # Permissões mínimas: só o necessário para publicar no Pages (sem contents: write).

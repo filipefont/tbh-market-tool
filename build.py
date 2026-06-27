@@ -976,7 +976,7 @@ def attach_trends(rows, windows=(("chg24", 86400), ("chg7", 7 * 86400))):
 
 # --- HTML (placeholders __TOKEN__ etc.; sem .format p/ o JS ficar legível) ----------------
 HTML_TEMPLATE = r"""<!doctype html>
-<html lang="pt-br"><head><meta charset="utf-8">
+<html lang="pt-br" data-ui="cubo"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0e1014">
 <title>TBH Market Tool — Itens × Mercado Steam</title>
@@ -998,12 +998,8 @@ HTML_TEMPLATE = r"""<!doctype html>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<!-- Layout: define data-ui ANTES do CSS pintar (evita flash). Cubo = PADRÃO desde 26/06/2026.
-     O layout "Atual" virou LEGADO/arquivado: só acessível por ?ui=atual (preservado p/ histórico). -->
-<script>(function(){try{var u=new URLSearchParams(location.search).get("ui");
-var v=(u==="atual")?"atual":"cubo";   // Cubo é o padrão; ?ui=atual mostra o layout legado
-document.documentElement.setAttribute("data-ui",v);
-}catch(e){document.documentElement.setAttribute("data-ui","cubo");}})();</script>
+<!-- Layout único "Cubo": data-ui="cubo" fica estático no <html> (sem flash, sem JS). O antigo A/B
+     foi removido — Cubo é o padrão desde 26/06/2026; o layout legado "Atual" vive só no histórico do git. -->
 <style>
   /* Identidade "terminal de mercado": base escura, acento ESMERALDA (ticker), ouro p/ destaque,
      números em mono tabular. Cores de grade dos itens (raridade) ficam à parte. */
@@ -2564,17 +2560,11 @@ function updateCuboStat(visible){
 }
 // move o GRUPO de filtros (busca + dropdowns + toggles) entre a barra do topo e a sidebar.
 // move o nó real (preserva os event listeners já fiados); idempotente.
-function relocateFilters(toCubo){
-  const slot=$("cbFilterSlot"), mc=$("marketControls"), grp=$("filterGroup"),
-        sslot=$("cbSearchSlot"), q=$("q");
-  if(!slot||!mc||!grp) return;
-  if(toCubo){
-    if(grp.parentElement!==slot) slot.appendChild(grp);
-    if(q && sslot && q.parentElement!==sslot) sslot.appendChild(q);        // busca no TOPO da sidebar
-  } else {
-    if(q && q.parentElement!==grp) grp.insertBefore(q, grp.firstChild);    // busca volta p/ início do grupo
-    if(grp.parentElement!==mc) mc.insertBefore(grp, mc.firstChild);
-  }
+function relocateFilters(){   // layout único Cubo: filtros vão p/ a sidebar e a busca p/ o topo dela
+  const slot=$("cbFilterSlot"), grp=$("filterGroup"), sslot=$("cbSearchSlot"), q=$("q");
+  if(!slot||!grp) return;
+  if(grp.parentElement!==slot) slot.appendChild(grp);
+  if(q && sslot && q.parentElement!==sslot) sslot.appendChild(q);
 }
 function render(){
   const rows = currentRows();
@@ -2771,29 +2761,6 @@ $("tabFarm").onclick = ()=>setView("farm");
 $("tabCraft").onclick = ()=>setView("craft");
 $("tabBag").onclick = ()=>setView("bag");
 
-// A/B de layout (Atual × Cubo). data-ui já foi setado no <head> (anti-flash); aqui só tratamos a
-// troca pelo usuário: aplica no <html>, persiste e reflete na URL (link compartilhável).
-function setUI(v){
-  v = (v==="cubo") ? "cubo" : "atual";
-  document.documentElement.setAttribute("data-ui", v);
-  try{ localStorage.setItem("tbh_ui", v); }catch(e){}
-  try{ const u=new URL(location.href);
-       if(v==="atual") u.searchParams.delete("ui"); else u.searchParams.set("ui", v);
-       history.replaceState(null, "", u); }catch(e){}
-  document.querySelectorAll("#uiSwitch button").forEach(b=>b.classList.toggle("on", b.dataset.ui===v));
-  relocateFilters(v==="cubo");        // filtros na sidebar (Cubo) ou na barra do topo (Atual)
-  buildCuboNav(); buildCuboRarity();
-  if(v==="cubo") applyCuboBar();   // aplica modo/ordenação salvos ao entrar no Cubo
-  syncCuboMode();
-  if(curView==="market") render(); else updateCuboStat(null);   // re-render Mercado conforme layout
-}
-(function initUISwitch(){
-  const cur = document.documentElement.getAttribute("data-ui") || "atual";
-  document.querySelectorAll("#uiSwitch button").forEach(b=>{
-    b.classList.toggle("on", b.dataset.ui===cur);
-    b.onclick = ()=>setUI(b.dataset.ui);
-  });
-})();
 // Barra do Cubo: toggle Cartões/Tabela + seletor de ordenação ao lado (como no modelo).
 // O seletor REFLETE o sortK atual (persistido em prefs, junto de avail/sellNow/etc.) — não força,
 // senão sobrescreveria filtros persistentes como "Vender agora" ao recarregar a página.
@@ -2828,7 +2795,7 @@ function setCuboSort(k){
   const cc=$("cbClear"); if(cc) cc.onclick=clearFilters;        // "limpar" do cabeçalho de Filtros
   const cs=$("cbConnect"); if(cs) cs.onclick=()=>setView("bag"); // "Conectar save" -> aba Mochila
   buildCuboNav();
-  relocateFilters(isCubo());
+  relocateFilters();
   syncCuboMode();
 })();
 // abrir detalhe ao clicar/Enter num cartão ou no hero (reusa openDetail com o item cru de DATA)

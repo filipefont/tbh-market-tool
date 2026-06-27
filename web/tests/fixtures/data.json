@@ -1,0 +1,104 @@
+[
+  {
+    "name": "Dimensional Helmet (Arcana) A",
+    "base": "Dimensional Helmet",
+    "type": "GEAR",
+    "grade": "ARCANA",
+    "gradeRank": 5,
+    "icon": "HELMET_500017",
+    "level": 80,
+    "gold": 2322432,
+    "usd": 0.03,
+    "listings": 554,
+    "real": {
+      "brl": {
+        "low": 0.15,
+        "lowText": "R$ 0,15",
+        "med": null,
+        "medText": null,
+        "vol": null,
+        "fetchedAt": 1782410199
+      }
+    },
+    "book": null,
+    "gearType": "HELMET",
+    "gearGroup": "ARMOR",
+    "parts": "HELMET",
+    "classes": [
+      "All"
+    ],
+    "variant": "A",
+    "tradable": true,
+    "slots": {
+      "decoration": 2,
+      "engraving": 1,
+      "inscription": 1
+    },
+    "uniqueMod": "SkewerShotBleedingStrike",
+    "attrs": {
+      "Armor": {
+        "value": 3429,
+        "disp": "+2215 / +1214"
+      },
+      "MaxHp": {
+        "value": 168,
+        "disp": "+168"
+      },
+      "HpRegenPerSec": {
+        "value": 1613,
+        "disp": "+16.1"
+      }
+    },
+    "chg24": 0.0,
+    "chg7": 0.0
+  },
+  {
+    "name": "Limitless Crossbow (Arcana) A",
+    "base": "Limitless Crossbow",
+    "type": "GEAR",
+    "grade": "ARCANA",
+    "gradeRank": 5,
+    "icon": "CROSSBOW_340014",
+    "level": 65,
+    "gold": 2348352,
+    "usd": 0.05,
+    "listings": 74,
+    "real": {
+      "brl": {
+        "low": 0.15,
+        "lowText": "R$ 0,15",
+        "med": null,
+        "medText": null,
+        "vol": null,
+        "fetchedAt": 1782410205
+      }
+    },
+    "book": null,
+    "gearType": "CROSSBOW",
+    "gearGroup": "WEAPON",
+    "parts": "MAIN_WEAPON",
+    "classes": [
+      "Hunter"
+    ],
+    "variant": "A",
+    "tradable": true,
+    "slots": {
+      "decoration": 2,
+      "engraving": 1,
+      "inscription": 1
+    },
+    "uniqueMod": "CrossbowTurretCooldown",
+    "attrs": {
+      "AttackDamage": {
+        "value": 1783,
+        "disp": "+764 / +89% / +129"
+      },
+      "AttackSpeed": {
+        "value": 208,
+        "disp": "+2.4% / +18.4%"
+      }
+    },
+    "chg24": 0.0,
+    "chg7": 0.0
+  }
+]

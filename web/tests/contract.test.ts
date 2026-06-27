@@ -3,11 +3,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { CraftData, History, MarketData, StagesData } from '../src/lib/contract/index.ts';
 
-// Guarda do contrato Python -> front: lê os api/*.json REAIS emitidos pelo build.py
-// e confere que ainda casam com os tipos do contrato. Se o shape mudar no Python
-// sem atualizar os tipos, este teste (ou o type-check) acusa.
+// Guarda do contrato Python -> front: valida AMOSTRAS enxutas dos api/*.json
+// (tests/fixtures/) — o shape que os tipos descrevem. Hermético (roda no CI sem
+// depender do pipeline Python). As fixtures são fatias reais; regenerá-las quando
+// o build.py mudar o shape (e os tipos via `npm run gen:types`).
 const api = (name: string) =>
-  JSON.parse(readFileSync(fileURLToPath(new URL(`../../api/${name}`, import.meta.url)), 'utf8'));
+  JSON.parse(readFileSync(fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url)), 'utf8'));
 
 describe('contrato api/*.json', () => {
   it('data.json é uma lista de itens de mercado', () => {

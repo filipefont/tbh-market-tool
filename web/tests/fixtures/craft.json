@@ -1,0 +1,283 @@
+[
+  {
+    "type": "Accessory",
+    "tier": 8,
+    "lvl": [
+      80,
+      80
+    ],
+    "distinct": 20,
+    "mats": [
+      {
+        "name": "Orichalcum Ore",
+        "icon": "Item_146002",
+        "grade": "BEYOND",
+        "count": 1,
+        "price": 1.79
+      },
+      {
+        "name": "Turquoise",
+        "icon": "Item_113003",
+        "grade": "LEGENDARY",
+        "count": 1,
+        "price": 0.1
+      },
+      {
+        "name": "Garnet",
+        "icon": "Item_113004",
+        "grade": "LEGENDARY",
+        "count": 1,
+        "price": 0.08
+      }
+    ],
+    "cost": 1.97,
+    "odds": [
+      {
+        "grade": "RARE",
+        "pct": 48.0
+      },
+      {
+        "grade": "LEGENDARY",
+        "pct": 30.0
+      },
+      {
+        "grade": "IMMORTAL",
+        "pct": 18.0
+      },
+      {
+        "grade": "ARCANA",
+        "pct": 3.8
+      },
+      {
+        "grade": "BEYOND",
+        "pct": 0.2
+      }
+    ],
+    "grades": [
+      {
+        "grade": "RARE",
+        "pct": 48.0,
+        "n": 0,
+        "ntot": 4,
+        "floor": null,
+        "ceil": null,
+        "best": null
+      },
+      {
+        "grade": "LEGENDARY",
+        "pct": 30.0,
+        "n": 4,
+        "ntot": 4,
+        "floor": 0.05,
+        "ceil": 5.24,
+        "best": {
+          "name": "Ethereal Ring",
+          "icon": "RING_620017",
+          "mname": "Ethereal Ring (Legendary) A",
+          "price": 5.24
+        }
+      },
+      {
+        "grade": "IMMORTAL",
+        "pct": 18.0,
+        "n": 3,
+        "ntot": 4,
+        "floor": 11.73,
+        "ceil": 26.35,
+        "best": {
+          "name": "Ethereal Earring",
+          "icon": "EARING_610017",
+          "mname": "Ethereal Earring (Immortal) A",
+          "price": 26.35
+        }
+      },
+      {
+        "grade": "ARCANA",
+        "pct": 3.8,
+        "n": 2,
+        "ntot": 4,
+        "floor": 3.59,
+        "ceil": 4.68,
+        "best": {
+          "name": "Ethereal Earring",
+          "icon": "EARING_610017",
+          "mname": "Ethereal Earring (Arcana) A",
+          "price": 4.68
+        }
+      },
+      {
+        "grade": "BEYOND",
+        "pct": 0.2,
+        "n": 1,
+        "ntot": 4,
+        "floor": 111.82,
+        "ceil": 111.82,
+        "best": {
+          "name": "Ethereal Earring",
+          "icon": "EARING_610017",
+          "mname": "Ethereal Earring (Beyond) A",
+          "price": 111.82
+        }
+      }
+    ],
+    "floor": 0.05,
+    "ceil": 111.82,
+    "ev": 3.77,
+    "best": {
+      "grade": "BEYOND",
+      "name": "Ethereal Earring",
+      "icon": "EARING_610017",
+      "mname": "Ethereal Earring (Beyond) A",
+      "price": 111.82
+    },
+    "pWin": 0.3795,
+    "verdict": "craft"
+  },
+  {
+    "type": "Accessory",
+    "tier": 4,
+    "lvl": [
+      30,
+      40
+    ],
+    "distinct": 48,
+    "mats": [
+      {
+        "name": "Stardust Ingot",
+        "icon": "Item_143001",
+        "grade": "LEGENDARY",
+        "count": 1,
+        "price": 0.21
+      },
+      {
+        "name": "Jade Stone",
+        "icon": "Item_111003",
+        "grade": "UNCOMMON",
+        "count": 1,
+        "price": 0.03
+      },
+      {
+        "name": "Amber Gem",
+        "icon": "Item_111004",
+        "grade": "UNCOMMON",
+        "count": 1,
+        "price": 0.03
+      }
+    ],
+    "cost": 0.27,
+    "odds": [
+      {
+        "grade": "UNCOMMON",
+        "pct": 11.0
+      },
+      {
+        "grade": "RARE",
+        "pct": 55.0
+      },
+      {
+        "grade": "LEGENDARY",
+        "pct": 23.0
+      },
+      {
+        "grade": "IMMORTAL",
+        "pct": 9.0
+      },
+      {
+        "grade": "ARCANA",
+        "pct": 1.8
+      },
+      {
+        "grade": "BEYOND",
+        "pct": 0.2
+      }
+    ],
+    "grades": [
+      {
+        "grade": "UNCOMMON",
+        "pct": 11.0,
+        "n": 0,
+        "ntot": 8,
+        "floor": null,
+        "ceil": null,
+        "best": null
+      },
+      {
+        "grade": "RARE",
+        "pct": 55.0,
+        "n": 0,
+        "ntot": 8,
+        "floor": null,
+        "ceil": null,
+        "best": null
+      },
+      {
+        "grade": "LEGENDARY",
+        "pct": 23.0,
+        "n": 6,
+        "ntot": 8,
+        "floor": 4.4,
+        "ceil": 14.37,
+        "best": {
+          "name": "Ruby Pendant",
+          "icon": "AMULET_600009",
+          "mname": "Ruby Pendant (Legendary) A",
+          "price": 14.37
+        }
+      },
+      {
+        "grade": "IMMORTAL",
+        "pct": 9.0,
+        "n": 5,
+        "ntot": 8,
+        "floor": 4.99,
+        "ceil": 11.5,
+        "best": {
+          "name": "Obsidian Bracer",
+          "icon": "BRACER_630007",
+          "mname": "Obsidian Bracer (Immortal) A",
+          "price": 11.5
+        }
+      },
+      {
+        "grade": "ARCANA",
+        "pct": 1.8,
+        "n": 5,
+        "ntot": 8,
+        "floor": 0.41,
+        "ceil": 9.79,
+        "best": {
+          "name": "Obsidian Bracer",
+          "icon": "BRACER_630007",
+          "mname": "Obsidian Bracer (Arcana) A",
+          "price": 9.79
+        }
+      },
+      {
+        "grade": "BEYOND",
+        "pct": 0.2,
+        "n": 4,
+        "ntot": 8,
+        "floor": 22.97,
+        "ceil": 46.85,
+        "best": {
+          "name": "Emerald Earring",
+          "icon": "EARING_610007",
+          "mname": "Emerald Earring (Beyond) A",
+          "price": 46.85
+        }
+      }
+    ],
+    "floor": 0.41,
+    "ceil": 46.85,
+    "ev": 1.89,
+    "best": {
+      "grade": "BEYOND",
+      "name": "Emerald Earring",
+      "icon": "EARING_610007",
+      "mname": "Emerald Earring (Beyond) A",
+      "price": 46.85
+    },
+    "pWin": 0.241,
+    "verdict": "craft"
+  }
+]

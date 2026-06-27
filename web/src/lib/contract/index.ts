@@ -8,7 +8,7 @@
 // `data`/`craft`/`stages` são gerados por quicktype a partir de amostras reais;
 // `history` é mantido à mão (mapa de chaves dinâmicas).
 
-export type { MarketItem } from './data.ts';
+export type { MarketItem, Grade } from './data.ts';
 export type { CraftRecipe } from './craft.ts';
 export type { Stage } from './stages.ts';
 export type { History, HistorySeries, HistoryPoint } from './history.ts';

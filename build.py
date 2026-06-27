@@ -998,12 +998,12 @@ HTML_TEMPLATE = r"""<!doctype html>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<!-- A/B de layout: define data-ui ANTES do CSS pintar (evita flash). Atual = default; Cubo = opt-in.
-     URL ?ui=cubo|atual tem prioridade e fica salvo; senão usa o localStorage. -->
+<!-- Layout: define data-ui ANTES do CSS pintar (evita flash). Cubo = PADRÃO desde 26/06/2026.
+     O layout "Atual" virou LEGADO/arquivado: só acessível por ?ui=atual (preservado p/ histórico). -->
 <script>(function(){try{var u=new URLSearchParams(location.search).get("ui");
-var v=u||localStorage.getItem("tbh_ui")||"atual";if(v!=="cubo")v="atual";
-document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tbh_ui",v);
-}catch(e){document.documentElement.setAttribute("data-ui","atual");}})();</script>
+var v=(u==="atual")?"atual":"cubo";   // Cubo é o padrão; ?ui=atual mostra o layout legado
+document.documentElement.setAttribute("data-ui",v);
+}catch(e){document.documentElement.setAttribute("data-ui","cubo");}})();</script>
 <style>
   /* Identidade "terminal de mercado": base escura, acento ESMERALDA (ticker), ouro p/ destaque,
      números em mono tabular. Cores de grade dos itens (raridade) ficam à parte. */
@@ -1559,10 +1559,6 @@ document.documentElement.setAttribute("data-ui",v);if(u)localStorage.setItem("tb
     <span class="chip" data-tip="data/hora em que o ranking (bulk) foi gerado — horário do build (UTC no GitHub Actions); veja o horário local em 'preços atualizados'">📅 bulk: __GENERATED__</span>
     <span class="chip"><span id="count">__N__</span> itens</span>
     <span id="status" aria-live="polite"><span class="dot off"></span>verificando servidor…</span>
-    <span class="seg uiswitch" id="uiSwitch" role="group" aria-label="layout do site"
-        data-tip="alterne entre o layout atual e o novo (Cubo, em validação) — sua escolha fica salva e vai no link">
-      <button type="button" data-ui="atual">Atual</button><button type="button" data-ui="cubo">Novo<span class="beta">beta</span></button>
-    </span>
     <button type="button" class="cb-connect cubo-only" id="cbConnect"
         data-tip="ler o save do jogo e ver o valor da sua mochila (em desenvolvimento)">⬆ Conectar save</button>
   </div>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { MarketItem } from '../../lib/contract/index.ts';
-  import { type Currency, currencySymbol, delta24, fmtAbbr, fmtPrice, priceOf } from '../../lib/format.ts';
+  import { type Currency, currencySymbol, delta24, fmtAbbr, fmtPrice, iconUrl, priceOf } from '../../lib/format.ts';
   import { gradeColor } from '../../lib/grades.ts';
   import Badge from './Badge.svelte';
   import Delta from './Delta.svelte';
@@ -28,7 +28,7 @@
 >
   <header class="flex items-center gap-2">
     <img
-      src={item.icon}
+      src={iconUrl(item.icon)}
       alt=""
       loading="lazy"
       class="size-9 flex-none rounded-md border border-line bg-field object-contain [image-rendering:pixelated]"

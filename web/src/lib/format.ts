@@ -2,6 +2,14 @@ import type { MarketItem } from './contract/index.ts';
 
 export type Currency = 'brl' | 'usd';
 
+// Ícones vêm como nome (ex.: "HELMET_500017"), não URL — a wiki serve em ICON_BASE.
+const ICON_BASE = 'https://www.taskbarherowiki.com/icons/';
+
+/** URL do ícone a partir do nome do asset (null se ausente). */
+export function iconUrl(icon: string | null | undefined): string | null {
+  return icon ? `${ICON_BASE}${encodeURIComponent(icon)}.png` : null;
+}
+
 /** Símbolo da moeda. */
 export function currencySymbol(cur: Currency): string {
   return cur === 'brl' ? 'R$' : '$';

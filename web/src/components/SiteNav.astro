@@ -1,0 +1,38 @@
+---
+// Navegação entre as abas (rotas estáticas, SEO-ready). Marca a ativa pela URL.
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const here = Astro.url.pathname.replace(/\/$/, '');
+
+const LINKS: { href: string; label: string }[] = [
+  { href: `${base}`, label: '◆ Ranking' },
+  { href: `${base}/efeitos`, label: '✦ Efeitos' },
+  { href: `${base}/farm`, label: '⛏ Farm' },
+  { href: `${base}/craft`, label: '⚒ Craft' },
+];
+
+const isActive = (href: string) => here === href.replace(/\/$/, '');
+---
+
+<header class="sticky top-0 z-10 border-b border-line bg-surface/95 backdrop-blur">
+  <nav class="mx-auto flex max-w-5xl flex-wrap items-center gap-1 px-4 py-2">
+    <a href={`${base}`} class="mr-3 text-sm font-semibold text-ink">
+      TBH Market <span class="text-accent">/next</span>
+    </a>
+    {
+      LINKS.map((l) => (
+        <a
+          href={l.href}
+          aria-current={isActive(l.href) ? 'page' : undefined}
+          class:list={[
+            'rounded-md px-2.5 py-1 text-xs transition-colors',
+            isActive(l.href)
+              ? 'bg-accent/15 text-ink'
+              : 'text-muted hover:bg-row-hover hover:text-ink',
+          ]}
+        >
+          {l.label}
+        </a>
+      ))
+    }
+  </nav>
+</header>

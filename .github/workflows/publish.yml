@@ -42,9 +42,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -52,7 +52,7 @@ jobs:
       # Se `prepare` salvasse aqui, ocuparia a chave data-${run_id} e o `finalize` não conseguiria
       # gravar a versão com as encomendas -> a próxima run restauraria dados sem order book.
       - name: Restaura dados (cache)
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: data
           key: data-${{ github.run_id }}
@@ -72,7 +72,7 @@ jobs:
       # dados-base (bulk + history.db + enriched + orderbook antigo p/ o TTL) p/ os shards e o finalize
       # usarem EXATAMENTE o mesmo snapshot -> a lista de candidatos das encomendas é idêntica entre eles.
       - name: Empacota dados-base
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: data-base
           path: data
@@ -88,14 +88,14 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3]   # casar com --orderbook-shards abaixo
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Baixa dados-base
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: data-base
           path: data
@@ -109,7 +109,7 @@ jobs:
           --orderbook-out shards/ob-${{ matrix.shard }}.json
 
       - name: Sobe o parcial do shard
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ob-shard-${{ matrix.shard }}
           path: shards/ob-${{ matrix.shard }}.json
@@ -126,26 +126,26 @@ jobs:
       # usa a URL da tentativa que deu certo (1ª ou retry)
       url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       # Node só p/ validar a sintaxe do app.js gerado (rede de segurança contra erro de JS no deploy).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
 
       - name: Baixa dados-base
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: data-base
           path: data
 
       # junta todos os parciais ob-shard-* em ./shards (merge-multiple achata os artifacts num só dir)
       - name: Baixa parciais dos shards
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: ob-shard-*
           path: shards
@@ -167,7 +167,7 @@ jobs:
       # save do cache com os dados JÁ consolidados (bulk + enrich + encomendas + histórico) p/ a
       # próxima run restaurar via restore-keys "data-".
       - name: Salva dados (cache)
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: data
           key: data-${{ github.run_id }}
@@ -188,7 +188,7 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq librsvg2-bin
           rsvg-convert -w 1200 -h 630 assets/og.svg -o _site/assets/og.png
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
@@ -196,11 +196,11 @@ jobs:
       # timeout (incidente transitório do GitHub). continue-on-error deixa o job seguir p/ o retry.
       - id: deployment
         continue-on-error: true
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
       # respiro p/ a fila do Pages limpar antes de tentar de novo
       - if: steps.deployment.outcome == 'failure'
         run: sleep 60
       # retry automático: uma nova tentativa costuma passar.
       - id: deployment_retry
         if: steps.deployment.outcome == 'failure'
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

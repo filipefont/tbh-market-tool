@@ -37,8 +37,16 @@ export const loadGems = (): MarketData => loadMarket().filter((d) => d.effects &
 
 /** Projeção enxuta do mercado p/ embutir no Mercado (só os campos da tabela/hero). */
 export function loadMarketSlim(): MarketLike[] {
+  const hist = loadHistory();
+  // últimos N preços por item, p/ o mini-gráfico (sparkline) dos cards/hero
+  const spark = (name: string): number[] | undefined => {
+    const s = hist[name];
+    if (!s || s.length < 2) return undefined;
+    return s.slice(-14).map((p) => p[1]);
+  };
   return loadMarket().map((d) => ({
     name: d.name,
+    base: d.base,
     key: d.key,
     grade: d.grade,
     gradeRank: d.gradeRank,
@@ -57,5 +65,6 @@ export function loadMarketSlim(): MarketLike[] {
     book: d.book,
     gradeLock: d.gradeLock,
     tradable: d.tradable,
+    spark: spark(d.name),
   }));
 }

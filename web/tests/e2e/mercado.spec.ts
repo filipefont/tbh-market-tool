@@ -36,6 +36,23 @@ test('Mercado: faceta multi-seleção e favoritos', async ({ page }) => {
   await expect(page.locator('a[href*="/item/"]').first()).toBeVisible();
 });
 
+test('Mercado: filtro na SIDEBAR reflete na tabela (cross-island)', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.getByRole('button', { name: /R\$ BRL/ })).toBeVisible();
+  const count = page.locator('span.tabular', { hasText: /itens/ }).last();
+  await expect(count).toHaveText(/\d+ itens/);
+  const before = await count.textContent();
+
+  // filtro de grade na sidebar
+  const facet = page.locator('details', { hasText: 'todas as grades' });
+  await facet.locator('summary').click();
+  await facet.getByRole('checkbox').first().check();
+  await facet.locator('summary').click();
+
+  await expect(count).not.toHaveText(before ?? ''); // a contagem do main mudou
+  await expect(page).toHaveURL(/grade=/); // estado refletido na URL
+});
+
 test('Mercado: filtro por atributo adiciona coluna dinâmica', async ({ page }) => {
   await page.goto('./');
   await expect(page.getByRole('button', { name: /R\$ BRL/ })).toBeVisible();

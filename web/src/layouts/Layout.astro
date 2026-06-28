@@ -44,7 +44,13 @@ const alternates = LOCALIZED.has(path)
     <title>{title}</title>
   </head>
   <body class={nav ? 'md:grid md:min-h-screen md:grid-cols-[248px_minmax(0,1fr)]' : ''}>
-    {nav && <CuboSidebar />}
+    {
+      nav && (
+        <CuboSidebar>
+          <slot name="filters" slot="filters" />
+        </CuboSidebar>
+      )
+    }
     <div class="min-w-0">
       <slot />
     </div>

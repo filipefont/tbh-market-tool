@@ -66,6 +66,15 @@ const home = getRelativeLocaleUrl(lang, '');
     </nav>
   </div>
 
+  {
+    Astro.slots.has('filters') && (
+      <div class="mt-5">
+        <div class="mb-2 text-[10px] tracking-wider text-hint uppercase">{t('nav.sectionFilters')}</div>
+        <slot name="filters" />
+      </div>
+    )
+  }
+
   <div class="mt-5 hidden md:block">
     <div class="mb-2 text-[10px] tracking-wider text-hint uppercase">{t('nav.sectionRarity')}</div>
     <RarityLegend />

@@ -1,0 +1,109 @@
+---
+import type { GetStaticPaths } from 'astro';
+import Layout from '../../layouts/Layout.astro';
+import GradeBadge from '../../components/ds/GradeBadge.svelte';
+import Delta from '../../components/ds/Delta.svelte';
+import Badge from '../../components/ds/Badge.svelte';
+import PriceChart from '../../components/ds/PriceChart.svelte';
+import { loadHistory, loadMarket } from '../../lib/data.ts';
+import { buildSlugMap } from '../../lib/slug.ts';
+import { fmtAbbr, fmtPrice, iconUrl } from '../../lib/format.ts';
+import { gradeColor } from '../../lib/grades.ts';
+import { attrLabel } from '../../lib/labels.ts';
+import { buyMax, buyOrders, goldPer, netAfterFee } from '../../lib/market.ts';
+
+// Uma página estática por item (SEO). getStaticPaths emite ~900 rotas.
+export const getStaticPaths = (() => {
+  const items = loadMarket();
+  const byName = new Map(items.map((it) => [it.name, it]));
+  const slugMap = buildSlugMap(items.map((it) => it.name));
+  const history = loadHistory();
+  return [...slugMap].map(([slug, name]) => {
+    const item = byName.get(name)!;
+    return { params: { slug }, props: { item, series: history[name] ?? [] } };
+  });
+}) satisfies GetStaticPaths;
+
+const { item, series } = Astro.props;
+const color = gradeColor(item.grade);
+const bm = buyMax(item);
+const effects = item.effects ?? [];
+
+const stats: { label: string; value: string; accent?: boolean }[] = [
+  { label: 'Gold (Cubo)', value: fmtAbbr(item.gold) },
+  { label: 'Preço (R$)', value: fmtPrice(item.real?.brl?.low ?? null, 'brl') },
+  { label: 'Preço (US$)', value: fmtPrice(item.usd, 'usd') },
+  { label: 'Gold / R$', value: fmtAbbr(goldPer(item, 'brl')), accent: true },
+  { label: 'Listagens', value: String(item.listings) },
+  { label: 'Maior enc. (R$)', value: fmtPrice(bm, 'brl') },
+  { label: 'Líquido −15% (R$)', value: fmtPrice(netAfterFee(bm), 'brl') },
+  { label: 'Encomendas', value: String(buyOrders(item) || '—') },
+];
+---
+
+<Layout
+  title={`${item.name} — TBH Market`}
+  description={`Preço, gold, variação e encomendas de ${item.name} (${item.grade}) no Taskbar Hero.`}
+>
+  <main class="mx-auto max-w-3xl px-4 py-8">
+    <header class="flex items-center gap-3">
+      <img
+        src={iconUrl(item.icon)}
+        alt=""
+        class="size-14 flex-none rounded-lg border bg-field object-contain [image-rendering:pixelated]"
+        style={`border-color:${color}66`}
+      />
+      <div class="min-w-0">
+        <h1 class="truncate text-2xl font-semibold" style={`color:${color}`}>{item.name}</h1>
+        <div class="mt-1 flex flex-wrap items-center gap-2">
+          <GradeBadge grade={item.grade} />
+          {item.gearType && <span class="text-xs text-muted">{item.gearType}</span>}
+          {item.level != null && <span class="text-xs text-muted">Lv {item.level}</span>}
+          {item.gradeLock && <Badge variant="lock" title="intradável pela trava de grade">🔒 trava</Badge>}
+          {!item.tradable && <Badge variant="lock">intradável</Badge>}
+          <Delta pct={item.chg24 ?? null} suffix="24h" />
+        </div>
+      </div>
+    </header>
+
+    <section class="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {
+        stats.map((s) => (
+          <div class="rounded-[10px] border border-white/10 bg-white/[0.04] p-3">
+            <div class="text-[10px] tracking-wide text-hint uppercase">{s.label}</div>
+            <div class:list={['tabular mt-1 text-lg font-semibold', s.accent ? 'text-accent' : 'text-ink']}>
+              {s.value}
+            </div>
+          </div>
+        ))
+      }
+    </section>
+
+    {
+      effects.length > 0 && (
+        <section class="mt-6 rounded-[10px] border border-white/10 bg-white/[0.04] p-4">
+          <h2 class="text-sm font-semibold text-ink">Efeitos</h2>
+          <ul class="mt-2 space-y-1">
+            {effects.map((eff) => (
+              <li class="flex items-center justify-between gap-2 text-sm">
+                <span class="text-muted">
+                  {eff.slot} · {attrLabel(eff.stat)}
+                  {eff.chance != null && eff.chance < 1 && <span class="text-hint"> ({Math.round(eff.chance * 100)}%)</span>}
+                </span>
+                <span class="tabular font-semibold text-accent">{eff.disp}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    <section class="mt-6 rounded-[10px] border border-white/10 bg-white/[0.04] p-4">
+      <PriceChart client:only="svelte" series={series} currency="brl" />
+    </section>
+
+    <p class="mt-6 text-xs text-hint">
+      <a href={import.meta.env.BASE_URL} class="text-link hover:underline">← voltar ao Mercado</a>
+    </p>
+  </main>
+</Layout>

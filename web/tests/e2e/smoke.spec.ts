@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('home /next carrega o Mercado e a tabela hidrata', async ({ page }) => {
+test('home carrega o Mercado e a tabela hidrata', async ({ page }) => {
   await page.goto('./');
 
   await expect(page.getByRole('heading', { name: 'Mercado' })).toBeVisible();

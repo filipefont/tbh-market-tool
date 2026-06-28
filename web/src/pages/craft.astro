@@ -1,0 +1,30 @@
+---
+import Layout from '../layouts/Layout.astro';
+import CraftCard from '../components/ds/CraftCard.svelte';
+import { loadCraft } from '../lib/data.ts';
+
+// Aba Craft: receitas com veredito (vale craftar / aposta / vender). SSG.
+// Ordena por margem (EV - custo) decrescente, como o legado.
+const margin = (c: { ev: number | null; cost: number | null }) =>
+  c.ev != null && c.cost != null ? c.ev - c.cost : -Infinity;
+const recipes = loadCraft().sort((a, b) => margin(b) - margin(a));
+---
+
+<Layout
+  title="Craft — TBH Market"
+  description="Receitas de craft do Taskbar Hero: custo dos reagentes, valor esperado de revenda e veredito (vale craftar, aposta ou vender)."
+>
+  <main class="mx-auto max-w-5xl px-4 py-8">
+    <header class="mb-5">
+      <h1 class="text-xl font-semibold text-ink">Craft</h1>
+      <p class="mt-1 max-w-prose text-sm text-muted">
+        {recipes.length} receitas. Compara o custo dos reagentes com o valor esperado de revenda
+        da pull. Preços em <span class="tabular">USD</span>.
+      </p>
+    </header>
+
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {recipes.map((recipe) => <CraftCard recipe={recipe} />)}
+    </div>
+  </main>
+</Layout>

@@ -1,5 +1,115 @@
 [
   {
+    "name": "Mystic Topaz",
+    "base": "Mystic Topaz",
+    "type": "MATERIAL",
+    "grade": "ARCANA",
+    "gradeRank": 5,
+    "icon": "Item_115002",
+    "level": null,
+    "gold": 31104,
+    "usd": 0.31,
+    "listings": 1287,
+    "real": {
+      "brl": {
+        "low": 0.82,
+        "lowText": "R$ 0,82",
+        "med": 0.8,
+        "medText": "R$ 0,80",
+        "vol": 1976,
+        "fetchedAt": 1780783729
+      }
+    },
+    "book": {
+      "brl": {
+        "buyMax": 2.8,
+        "buyOrders": 172,
+        "sellMin": null,
+        "sellOrders": 0,
+        "buyBook": [
+          [
+            2.8,
+            10
+          ],
+          [
+            0.9,
+            4
+          ],
+          [
+            0.59,
+            1
+          ],
+          [
+            0.57,
+            10
+          ],
+          [
+            0.48,
+            1
+          ],
+          [
+            0.32,
+            1
+          ],
+          [
+            0.3,
+            1
+          ],
+          [
+            0.27,
+            10
+          ],
+          [
+            0.26,
+            3
+          ],
+          [
+            0.25,
+            4
+          ],
+          [
+            0.22,
+            80
+          ],
+          [
+            0.16,
+            36
+          ]
+        ],
+        "buyNotional": 68.48,
+        "fetchedAt": 1782359273
+      }
+    },
+    "gearType": null,
+    "gearGroup": null,
+    "parts": null,
+    "classes": [],
+    "variant": null,
+    "tradable": true,
+    "chg24": 0.0,
+    "chg7": 0.0,
+    "effects": [
+      {
+        "slot": "Weapon",
+        "stat": "LightningDamagePercent",
+        "disp": "+80~100%",
+        "chance": 1.0
+      },
+      {
+        "slot": "Armor",
+        "stat": "LightningResistance",
+        "disp": "+30~35%",
+        "chance": 1.0
+      },
+      {
+        "slot": "Accessory",
+        "stat": "CastSpeed",
+        "disp": "+20~25%",
+        "chance": 1.0
+      }
+    ]
+  },
+  {
     "name": "Dimensional Helmet (Arcana) A",
     "base": "Dimensional Helmet",
     "type": "GEAR",
@@ -47,55 +157,6 @@
       "HpRegenPerSec": {
         "value": 1613,
         "disp": "+16.1"
-      }
-    },
-    "chg24": 0.0,
-    "chg7": 0.0
-  },
-  {
-    "name": "Limitless Crossbow (Arcana) A",
-    "base": "Limitless Crossbow",
-    "type": "GEAR",
-    "grade": "ARCANA",
-    "gradeRank": 5,
-    "icon": "CROSSBOW_340014",
-    "level": 65,
-    "gold": 2348352,
-    "usd": 0.05,
-    "listings": 74,
-    "real": {
-      "brl": {
-        "low": 0.15,
-        "lowText": "R$ 0,15",
-        "med": null,
-        "medText": null,
-        "vol": null,
-        "fetchedAt": 1782410205
-      }
-    },
-    "book": null,
-    "gearType": "CROSSBOW",
-    "gearGroup": "WEAPON",
-    "parts": "MAIN_WEAPON",
-    "classes": [
-      "Hunter"
-    ],
-    "variant": "A",
-    "tradable": true,
-    "slots": {
-      "decoration": 2,
-      "engraving": 1,
-      "inscription": 1
-    },
-    "uniqueMod": "CrossbowTurretCooldown",
-    "attrs": {
-      "AttackDamage": {
-        "value": 1783,
-        "disp": "+764 / +89% / +129"
-      },
-      "AttackSpeed": {
-        "value": 208,
-        "disp": "+2.4% / +18.4%"
       }
     },
     "chg24": 0.0,

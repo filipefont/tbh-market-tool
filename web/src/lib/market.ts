@@ -12,6 +12,7 @@ export type MarketLike = Pick<
   | 'type'
   | 'gearType'
   | 'classes'
+  | 'attrs'
   | 'level'
   | 'gold'
   | 'usd'

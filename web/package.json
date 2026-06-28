@@ -16,6 +16,7 @@
     "gen:types": "quicktype ../api/data.json --lang ts --just-types --prefer-unions -t MarketItem -o src/lib/contract/data.ts && quicktype ../api/craft.json --lang ts --just-types --prefer-unions -t CraftRecipe -o src/lib/contract/craft.ts && quicktype ../api/stages.json --lang ts --just-types --prefer-unions -t Stage -o src/lib/contract/stages.ts"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.3",
     "@astrojs/svelte": "^9.0.0",
     "@tailwindcss/vite": "^4.3.1",
     "astro": "^7.0.3",

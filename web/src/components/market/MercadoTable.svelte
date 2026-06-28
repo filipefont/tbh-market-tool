@@ -2,6 +2,7 @@
   import { type Currency, fmtAbbr, fmtPrice, iconUrl } from '../../lib/format.ts';
   import { GRADE_ORDER, gradeColor } from '../../lib/grades.ts';
   import { type MarketLike, type MarketRow, deriveRows } from '../../lib/market.ts';
+  import { slugify } from '../../lib/slug.ts';
   import CurrencyToggle from '../ds/CurrencyToggle.svelte';
   import Delta from '../ds/Delta.svelte';
   import GradeBadge from '../ds/GradeBadge.svelte';
@@ -108,6 +109,7 @@
   });
 
   const money = (v: number | null) => fmtPrice(v, cur);
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 </script>
 
 <div class="space-y-4">
@@ -186,7 +188,7 @@
               >
                 <div class="flex min-w-0 items-center gap-2 px-2">
                   <img src={iconUrl(r.item.icon)} alt="" loading="lazy" class="size-5 flex-none rounded object-contain [image-rendering:pixelated]" style:border={`1px solid ${gradeColor(r.grade)}55`} />
-                  <span class="truncate text-ink">{r.name}</span>
+                  <a href={`${base}/item/${slugify(r.name)}`} class="truncate text-ink hover:text-accent hover:underline">{r.name}</a>
                 </div>
                 <div class="px-2"><GradeBadge grade={r.grade} /></div>
                 <div class="truncate px-2 text-muted">{r.gearType || '—'}</div>

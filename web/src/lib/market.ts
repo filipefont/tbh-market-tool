@@ -6,6 +6,7 @@ import { type Currency, priceOf } from './format.ts';
 export type MarketLike = Pick<
   MarketItem,
   | 'name'
+  | 'key'
   | 'grade'
   | 'gradeRank'
   | 'gearType'

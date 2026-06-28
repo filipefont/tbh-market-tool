@@ -1,6 +1,7 @@
 [
   {
     "name": "Mystic Topaz",
+    "key": 115002,
     "base": "Mystic Topaz",
     "type": "MATERIAL",
     "grade": "ARCANA",
@@ -111,6 +112,7 @@
   },
   {
     "name": "Dimensional Helmet (Arcana) A",
+    "key": 505171,
     "base": "Dimensional Helmet",
     "type": "GEAR",
     "grade": "ARCANA",

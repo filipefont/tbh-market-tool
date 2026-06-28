@@ -4,6 +4,7 @@ import { deriveRows, goldPer, netAfterFee, STEAM_FEE } from '../src/lib/market.t
 
 const item = (over: Partial<MarketLike> = {}): MarketLike => ({
   name: 'Test',
+  key: 1,
   grade: 'ARCANA',
   gradeRank: 5,
   gearType: 'SWORD',

@@ -43,14 +43,11 @@ test('Mercado: filtro na SIDEBAR reflete na tabela (cross-island)', async ({ pag
   await expect(count).toHaveText(/\d+ itens/);
   const before = await count.textContent();
 
-  // filtro de grade na sidebar
-  const facet = page.locator('details', { hasText: 'todas as grades' });
-  await facet.locator('summary').click();
-  await facet.getByRole('checkbox').first().check();
-  await facet.locator('summary').click();
+  // toggle "com encomenda" na sidebar (determinístico: muda a contagem em qualquer dataset)
+  await page.locator('label', { hasText: 'com encomenda' }).getByRole('checkbox').check();
 
   await expect(count).not.toHaveText(before ?? ''); // a contagem do main mudou
-  await expect(page).toHaveURL(/grade=/); // estado refletido na URL
+  await expect(page).toHaveURL(/book=1/); // estado refletido na URL
 });
 
 test('Mercado: filtro por atributo adiciona coluna dinâmica', async ({ page }) => {

@@ -1,22 +1,30 @@
 @import "tailwindcss";
 
+/* Fontes da identidade (self-hosted; offline-friendly p/ o PWA):
+   Figtree (corpo), Space Grotesk (display/números grandes), IBM Plex Mono (tabular). */
+@import "@fontsource-variable/figtree";
+@import "@fontsource-variable/space-grotesk";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
 /* ──────────────────────────────────────────────────────────────────────────
-   Tokens da identidade "Cubo" (portados de assets/styles.css do front legado).
-   Fonte da verdade do tema durante a migração (Etapa 4). Vira o design system
-   v2 na Fase 1. Esmeralda/menta + âmbar + mono "terminal".
+   Tokens da identidade "Cubo" — fiéis à paleta --cb-* do front legado
+   (assets/styles.css). Esmeralda/menta + âmbar + display Space Grotesk + mono.
    ────────────────────────────────────────────────────────────────────────── */
 @theme {
-  /* superfícies / linhas da tabela densa */
-  --color-base: #0e1014;
-  --color-row: #0e1014;
-  --color-row-alt: #161922;
-  --color-row-hover: #1c2029;
-  --color-surface: #1b1e26;
-  --color-field: #0f1116;
+  /* superfícies / linhas */
+  --color-base: #0c0f14;        /* cb-bg */
+  --color-row: #0c0f14;
+  --color-row-alt: #11161d;
+  --color-row-hover: #161c25;
+  --color-surface: #11161d;     /* cb-surface */
+  --color-sidebar: #0a0d12;     /* cb-sidebar */
+  --color-field: #0d1116;
 
   /* esmeralda / menta (ação, destaque, foco) */
-  --color-accent: #19c37d;
-  --color-accent-ink: #08130d;
+  --color-accent: #2dd4a7;      /* menta do Cubo (hero/brand/spark) */
+  --color-accent-ink: #06140f;
   --color-accent-bright: #2bd48f;
   --color-link: #4fd1a5;
 
@@ -25,17 +33,18 @@
   --color-gold-bg: #2c2710;
 
   /* texto */
-  --color-ink: #e6e8ee;
-  --color-muted: #9aa3b8;
-  --color-hint: #5b6378;
+  --color-ink: #eef1f5;         /* cb-text */
+  --color-muted: #aeb6c2;       /* cb-muted */
+  --color-hint: #7e8696;        /* cb-faint */
 
   /* bordas */
-  --color-line: #2a2e3a;
-  --color-line-soft: #21242e;
+  --color-line: #232a35;        /* cb-border */
+  --color-line-soft: #1b2029;   /* cb-border-soft */
 
   /* tipografia */
-  --font-sans: system-ui, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --font-sans: "Figtree Variable", system-ui, "Segoe UI", sans-serif;
+  --font-display: "Space Grotesk Variable", "Figtree Variable", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 :root {
@@ -53,4 +62,10 @@ body {
 .tabular {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* números/títulos de destaque (hero, métrica do card) */
+.display {
+  font-family: var(--font-display);
+  letter-spacing: -0.3px;
 }

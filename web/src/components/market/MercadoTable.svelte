@@ -35,6 +35,8 @@
     viewTable: string;
     viewCards: string;
     movers: string;
+    heroDeal: string;
+    heroCube: string;
     cols: Record<SortKey, string>;
   }
   interface Props {
@@ -96,7 +98,7 @@
   let cur = $state<Currency>(p0.get('cur') === 'usd' ? 'usd' : 'brl');
   let sortKey = $state<string>(p0.get('sort') || 'goldPer');
   let sortDir = $state<'asc' | 'desc'>(p0.get('dir') === 'asc' ? 'asc' : 'desc');
-  let view = $state<'table' | 'cards'>(p0.get('view') === 'cards' ? 'cards' : 'table');
+  let view = $state<'table' | 'cards'>(p0.get('view') === 'table' ? 'table' : 'cards');
   let scrollTop = $state(0);
   let viewportH = $state(600);
 
@@ -222,7 +224,7 @@
     if (cur !== 'brl') p.set('cur', cur);
     if (sortKey !== 'goldPer') p.set('sort', sortKey);
     if (sortDir !== 'desc') p.set('dir', sortDir);
-    if (view !== 'table') p.set('view', view);
+    if (view !== 'cards') p.set('view', view);
     const qs = p.toString();
     history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
   });
@@ -275,26 +277,43 @@
     </div>
   {/if}
 
-  <!-- hero -->
+  <!-- hero: melhor negócio (fiel a .cubohero) -->
   {#if best}
-    <div class="flex items-center gap-3 rounded-[10px] border border-white/10 bg-gold-bg/40 p-3" style:border-left={`3px solid ${gradeColor(best.grade)}`}>
-      <img src={iconUrl(best.item.icon)} alt="" class="size-11 flex-none rounded-md border border-line bg-field object-contain [image-rendering:pixelated]" />
+    <div
+      class="grid grid-cols-[1fr_auto] items-center gap-[18px] rounded-2xl border border-[#1e2b27] p-[20px_22px]"
+      style:background="linear-gradient(120deg,#11201b,#0e1318 72%)"
+    >
       <div class="min-w-0">
-        <div class="flex items-center gap-2">
-          <span class="text-[10px] font-bold text-gold">★ TOP</span>
-          <a href={itemHref(best.name)} class="truncate font-semibold text-ink hover:text-accent hover:underline">{best.name}</a>
-          <GradeBadge grade={best.grade} />
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="rounded-md bg-gold px-2 py-[3px] text-[11px] font-bold text-[#1c1404]">★ TOP</span>
+          <span class="rounded-full bg-accent px-2.5 py-[3px] text-[11px] font-bold text-accent-ink">{msgs.heroDeal}</span>
         </div>
-        <div class="tabular mt-0.5 text-xs text-muted"><b class="text-accent">{fmtAbbr(best.goldPer)}</b> gold/{cur === 'brl' ? 'R$' : '$'} · Gold {fmtAbbr(best.gold)} · {money(best.price)}</div>
+        <div class="mt-3.5 flex items-center gap-3.5">
+          <img src={iconUrl(best.item.icon)} alt="" class="size-12 flex-none rounded-lg border bg-field object-contain [image-rendering:pixelated]" style:border-color={`${gradeColor(best.grade)}66`} />
+          <div class="min-w-0">
+            <a href={itemHref(best.name)} class="display block truncate text-[23px] font-semibold text-ink hover:text-accent">{best.name}</a>
+            <div class="mt-1 flex items-center gap-1.5 text-[12.5px]"><GradeBadge grade={best.grade} /></div>
+          </div>
+        </div>
+        <div class="mt-[18px] flex flex-wrap gap-6">
+          <div>
+            <div class="display text-[32px] leading-none font-bold text-accent">{fmtAbbr(best.goldPer)}</div>
+            <div class="mt-1 text-[10.5px] text-hint">gold / {cur === 'brl' ? 'R$' : '$'}</div>
+          </div>
+          <div class="border-l border-[#1e2b27] pl-6">
+            <div class="display text-[32px] leading-none font-bold text-ink">{fmtAbbr(best.gold)}</div>
+            <div class="mt-1 text-[10.5px] text-hint">{msgs.heroCube} · {money(best.price)}</div>
+          </div>
+        </div>
       </div>
-      <div class="ml-auto"><Delta pct={best.chg24} suffix="24h" /></div>
+      <div class="self-end"><Delta pct={best.chg24} suffix="24h" /></div>
     </div>
   {/if}
 
   {#if total === 0}
     <p class="py-8 text-center text-sm text-muted">Nenhum item corresponde aos filtros.</p>
   {:else if view === 'cards'}
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div class="grid gap-[14px] [grid-template-columns:repeat(auto-fill,minmax(258px,1fr))]">
       {#each cardsList as r, i (r.name)}
         <ItemCard item={r.item} rank={i + 1} currency={cur} favorited={isFav(r.name)} onfav={() => toggleFav(r.name)} />
       {/each}

@@ -39,6 +39,7 @@ test('Mercado: faceta multi-seleção e favoritos', async ({ page }) => {
 test('Mercado: filtro por atributo adiciona coluna dinâmica', async ({ page }) => {
   await page.goto('./');
   await expect(page.getByRole('button', { name: /R\$ BRL/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Tabela' }).click(); // colunas só na tabela
 
   const facet = page.locator('details', { hasText: 'atributo' });
   await facet.locator('summary').click();

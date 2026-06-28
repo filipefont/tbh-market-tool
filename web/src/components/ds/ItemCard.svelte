@@ -11,8 +11,10 @@
     item: MarketLike;
     rank?: number;
     currency?: Currency;
+    favorited?: boolean;
+    onfav?: () => void;
   }
-  let { item, rank, currency = 'brl' }: Props = $props();
+  let { item, rank, currency = 'brl', favorited, onfav }: Props = $props();
 
   const color = $derived(gradeColor(item.grade));
   const price = $derived(priceOf(item, currency));
@@ -42,6 +44,9 @@
         {#if !item.tradable}<Badge variant="lock">intradável</Badge>{/if}
       </div>
     </div>
+    {#if onfav}
+      <button type="button" onclick={onfav} aria-pressed={favorited} title="favoritar" class="flex-none text-sm leading-none {favorited ? 'text-gold' : 'text-hint hover:text-gold'}">★</button>
+    {/if}
     {#if rank != null}
       <div class="flex flex-col items-end gap-1">
         <span class="tabular text-xs text-hint">#{rank}</span>

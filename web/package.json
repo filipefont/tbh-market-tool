@@ -13,7 +13,7 @@
     "check": "astro check",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "gen:types": "quicktype ../api/data.json --lang ts --just-types --prefer-unions -t MarketItem -o src/lib/contract/data.ts && quicktype ../api/craft.json --lang ts --just-types --prefer-unions -t CraftRecipe -o src/lib/contract/craft.ts && quicktype ../api/stages.json --lang ts --just-types --prefer-unions -t Stage -o src/lib/contract/stages.ts"
+    "gen:types": "npx -y quicktype@23 ../api/data.json --lang ts --just-types --prefer-unions -t MarketItem -o src/lib/contract/data.ts && npx -y quicktype@23 ../api/craft.json --lang ts --just-types --prefer-unions -t CraftRecipe -o src/lib/contract/craft.ts && npx -y quicktype@23 ../api/stages.json --lang ts --just-types --prefer-unions -t Stage -o src/lib/contract/stages.ts"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.3",

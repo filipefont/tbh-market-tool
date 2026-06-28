@@ -1,0 +1,39 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import BagInspector from '../bag/BagInspector.svelte';
+import { loadMarketSlim } from '../../lib/data.ts';
+import { resolveLang, useTranslations } from '../../i18n/ui.ts';
+
+// My Bag: lê o save localmente e valora o inventário. Compartilhado PT/EN.
+const lang = resolveLang(Astro.currentLocale);
+const t = useTranslations(lang);
+const items = loadMarketSlim();
+
+const msgs = {
+  select: t('bag.select'),
+  privacy: t('bag.privacy'),
+  loading: t('bag.loading'),
+  error: t('bag.error'),
+  value: t('bag.value'),
+  valueHint: t('bag.valueHint'),
+  gold: t('bag.gold'),
+  items: t('bag.items'),
+  withPrice: t('bag.withPrice'),
+  noPrice: t('bag.noPrice'),
+  offCatalog: t('bag.offCatalog'),
+  colQty: t('bag.colQty'),
+  colUnit: t('bag.colUnit'),
+  colTotal: t('bag.colTotal'),
+};
+---
+
+<Layout title={`${t('bag.title')} — TBH Market`} description={t('bag.subtitle')}>
+  <main class="mx-auto max-w-4xl px-4 py-8">
+    <header class="mb-5">
+      <h1 class="text-xl font-semibold text-ink">{t('bag.title')}</h1>
+      <p class="mt-1 max-w-prose text-sm text-muted">{t('bag.subtitle')}</p>
+    </header>
+
+    <BagInspector client:only="svelte" {items} {msgs} />
+  </main>
+</Layout>

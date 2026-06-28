@@ -1,5 +1,6 @@
 export interface MarketItem {
     name:       string;
+    key:        number;
     base:       string;
     type:       Type;
     grade:      Grade;

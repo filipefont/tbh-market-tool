@@ -16,3 +16,6 @@ assets/app.js
 assets/styles.css
 # feed público gerado pelo build (api/data.json) — CI regenera
 api/
+
+# saves de exemplo (privados; exe grande) — não versionar
+.arquivo_save_exemplo/

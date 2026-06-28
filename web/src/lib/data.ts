@@ -39,6 +39,7 @@ export const loadGems = (): MarketData => loadMarket().filter((d) => d.effects &
 export function loadMarketSlim(): MarketLike[] {
   return loadMarket().map((d) => ({
     name: d.name,
+    key: d.key,
     grade: d.grade,
     gradeRank: d.gradeRank,
     gearType: d.gearType,

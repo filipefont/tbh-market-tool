@@ -12,6 +12,7 @@ const NAV: { path: string; key: UIKey }[] = [
   { path: 'efeitos', key: 'nav.effects' },
   { path: 'farm', key: 'nav.farm' },
   { path: 'craft', key: 'nav.craft' },
+  { path: 'bag', key: 'nav.bag' },
 ];
 
 // caminho lógico atual (sem base nem prefixo de locale) p/ marcar o ativo + trocar idioma
@@ -21,7 +22,7 @@ const path = Astro.url.pathname
   .replace(/^\/(en)(?=\/|$)/, '')
   .replace(/^\/+|\/+$/g, '');
 // rotas com versão localizada (p/ o seletor não cair em 404; ex.: /item é só PT)
-const LOCALIZED = new Set(['', 'efeitos', 'farm', 'craft']);
+const LOCALIZED = new Set(['', 'efeitos', 'farm', 'craft', 'bag']);
 const switchPath = LOCALIZED.has(path) ? path : '';
 
 const home = getRelativeLocaleUrl(lang, '');

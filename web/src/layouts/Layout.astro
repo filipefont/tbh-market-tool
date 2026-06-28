@@ -21,7 +21,7 @@ const path = Astro.url.pathname
   .replace(base, '')
   .replace(/^\/(en)(?=\/|$)/, '')
   .replace(/^\/+|\/+$/g, '');
-const LOCALIZED = new Set(['', 'efeitos', 'farm', 'craft']);
+const LOCALIZED = new Set(['', 'efeitos', 'farm', 'craft', 'bag']);
 const alternates = LOCALIZED.has(path)
   ? [
       { hreflang: 'pt-BR', href: getAbsoluteLocaleUrl('pt', path) },

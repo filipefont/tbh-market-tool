@@ -774,6 +774,7 @@ def _row_from_item(it, name, usd, listings, enriched, book=None):
     """Monta uma linha. usd=None => item sem preço do bulk (marcado noBulk)."""
     row = {
         "name": name,                       # nome de mercado (com grade/variante) — chave p/ Steam/fav/histórico
+        "key": it.get("key"),               # ItemKey numérico do jogo (cruza com o save .es3 — My Bag)
         "base": it.get("name") or name,     # nome "limpo" p/ exibir (sem "(Grade) A")
         "type": it["type"],
         "grade": it.get("grade"),

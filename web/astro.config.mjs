@@ -16,6 +16,14 @@ export default defineConfig({
   output: 'static',
   trailingSlash: 'ignore',
 
+  // i18n (Fase 4b): PT padrão (sem prefixo) + EN em /en. A "casca" (nav, títulos,
+  // controles) é traduzida; dados do jogo (itens) seguem em 1 idioma por ora.
+  i18n: {
+    locales: ['pt', 'en'],
+    defaultLocale: 'pt',
+    routing: { prefixDefaultLocale: false },
+  },
+
   integrations: [svelte(), sitemap()],
 
   vite: {

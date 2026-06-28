@@ -1,0 +1,43 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import MercadoTable from '../market/MercadoTable.svelte';
+import { loadMarketSlim } from '../../lib/data.ts';
+import { resolveLang, useTranslations } from '../../i18n/ui.ts';
+
+// Conteúdo do Mercado, compartilhado entre as rotas PT (/) e EN (/en). O idioma
+// vem do Astro.currentLocale (resolvido pela URL).
+const lang = resolveLang(Astro.currentLocale);
+const t = useTranslations(lang);
+const items = loadMarketSlim();
+
+const msgs = {
+  search: t('mercado.search'),
+  allGrades: t('mercado.allGrades'),
+  items: t('mercado.items'),
+  cols: {
+    name: t('col.item'),
+    grade: t('col.grade'),
+    gearType: t('col.type'),
+    level: t('col.lvl'),
+    gold: t('col.gold'),
+    price: t('col.price'),
+    chg24: t('col.delta'),
+    goldPer: t('col.goldPer'),
+    listings: t('col.listings'),
+    buyMax: t('col.buyMax'),
+    buyNet: t('col.net'),
+    buyOrders: t('col.orders'),
+  },
+};
+---
+
+<Layout title={`${t('mercado.title')} — TBH Market`} description={t('mercado.subtitle')}>
+  <main class="mx-auto max-w-6xl px-4 py-6">
+    <header class="mb-4">
+      <h1 class="text-xl font-semibold text-ink">{t('mercado.title')}</h1>
+      <p class="mt-1 text-sm text-muted">{items.length} {t('mercado.items')}. {t('mercado.subtitle')}</p>
+    </header>
+
+    <MercadoTable client:only="svelte" {items} {msgs} />
+  </main>
+</Layout>

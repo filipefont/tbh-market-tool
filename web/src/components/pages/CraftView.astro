@@ -1,0 +1,25 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import CraftCard from '../ds/CraftCard.svelte';
+import { loadCraft } from '../../lib/data.ts';
+import { resolveLang, useTranslations } from '../../i18n/ui.ts';
+
+const lang = resolveLang(Astro.currentLocale);
+const t = useTranslations(lang);
+const margin = (c: { ev: number | null; cost: number | null }) =>
+  c.ev != null && c.cost != null ? c.ev - c.cost : -Infinity;
+const recipes = loadCraft().sort((a, b) => margin(b) - margin(a));
+---
+
+<Layout title={`${t('craft.title')} — TBH Market`} description={t('craft.subtitle')}>
+  <main class="mx-auto max-w-5xl px-4 py-8">
+    <header class="mb-5">
+      <h1 class="text-xl font-semibold text-ink">{t('craft.title')}</h1>
+      <p class="mt-1 max-w-prose text-sm text-muted">{recipes.length} {t('craft.subtitle')}</p>
+    </header>
+
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {recipes.map((recipe) => <CraftCard recipe={recipe} />)}
+    </div>
+  </main>
+</Layout>

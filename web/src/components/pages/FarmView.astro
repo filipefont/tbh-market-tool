@@ -1,0 +1,25 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import StageCard from '../ds/StageCard.svelte';
+import { loadMarket, loadStages } from '../../lib/data.ts';
+import { resolveLang, useTranslations } from '../../i18n/ui.ts';
+
+const lang = resolveLang(Astro.currentLocale);
+const t = useTranslations(lang);
+const stages = loadStages().sort((a, b) => (b.ev || 0) - (a.ev || 0));
+const prices: Record<string, number | null> = {};
+for (const item of loadMarket()) prices[item.name] = item.usd ?? null;
+---
+
+<Layout title={`${t('farm.title')} — TBH Market`} description={t('farm.subtitle')}>
+  <main class="mx-auto max-w-5xl px-4 py-8">
+    <header class="mb-5">
+      <h1 class="text-xl font-semibold text-ink">{t('farm.title')}</h1>
+      <p class="mt-1 text-sm text-muted">{stages.length} {t('farm.subtitle')}</p>
+    </header>
+
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {stages.map((stage) => <StageCard stage={stage} prices={prices} />)}
+    </div>
+  </main>
+</Layout>

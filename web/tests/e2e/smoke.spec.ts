@@ -7,12 +7,14 @@ test('home carrega o Mercado e a tabela hidrata', async ({ page }) => {
   // shell do Cubo: sidebar com brand
   await expect(page.getByText('TBH Market Tool')).toBeVisible();
 
-  // a ilha (client:only) hidratou: toggle de moeda e cabeçalho ordenável existem
+  // a ilha (client:only) hidratou: toggle de moeda + cards (visão padrão = Cubo)
   await expect(page.getByRole('button', { name: /R\$ BRL/ })).toBeVisible();
+  await expect(page.locator('article').first()).toBeVisible();
+
+  // alternar p/ tabela mostra o cabeçalho ordenável e ordena
+  await page.getByRole('button', { name: 'Tabela' }).click();
   const sortHeader = page.getByRole('button', { name: /Gold\/moeda/ });
   await expect(sortHeader).toBeVisible();
-
-  // ordenar por uma coluna não quebra (marca a seta na ativa)
   await sortHeader.click();
   await expect(sortHeader).toContainText(/[▲▼]/);
 });

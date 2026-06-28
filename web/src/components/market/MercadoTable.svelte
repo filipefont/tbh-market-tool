@@ -1,6 +1,7 @@
 <script lang="ts">
   import { type Currency, fmtAbbr, fmtPrice, iconUrl } from '../../lib/format.ts';
   import { GRADE_ORDER, gradeColor } from '../../lib/grades.ts';
+  import { attrLabel } from '../../lib/labels.ts';
   import { type MarketLike, type MarketRow, deriveRows } from '../../lib/market.ts';
   import { slugify } from '../../lib/slug.ts';
   import CurrencyToggle from '../ds/CurrencyToggle.svelte';
@@ -19,6 +20,7 @@
     allTypes: string;
     allGearTypes: string;
     allClasses: string;
+    allAttrs: string;
     lvlMin: string;
     lvlMax: string;
     goldMin: string;
@@ -81,6 +83,7 @@
   let typeF = $state<string[]>(csv(p0.get('type')));
   let gtype = $state<string[]>(csv(p0.get('gt')));
   let cls = $state<string[]>(csv(p0.get('cls')));
+  let attrSel = $state<string[]>(csv(p0.get('attr')));
   let lvlMin = $state(p0.get('lmin') ?? '');
   let lvlMax = $state(p0.get('lmax') ?? '');
   let goldMin = $state(p0.get('gmin') ?? '');
@@ -91,7 +94,7 @@
   let onlyBook = $state(p0.get('book') === '1');
   let onlyFav = $state(p0.get('fav') === '1');
   let cur = $state<Currency>(p0.get('cur') === 'usd' ? 'usd' : 'brl');
-  let sortKey = $state<SortKey>((p0.get('sort') as SortKey) || 'goldPer');
+  let sortKey = $state<string>(p0.get('sort') || 'goldPer');
   let sortDir = $state<'asc' | 'desc'>(p0.get('dir') === 'asc' ? 'asc' : 'desc');
   let view = $state<'table' | 'cards'>(p0.get('view') === 'cards' ? 'cards' : 'table');
   let scrollTop = $state(0);
@@ -115,6 +118,11 @@
   const presentClasses = $derived(
     [...new Set(items.flatMap((it) => it.classes ?? []))].filter((c) => c && c !== 'All').sort(),
   );
+  const presentAttrs = $derived(
+    [...new Set(items.flatMap((it) => Object.keys(it.attrs ?? {})))].sort((a, b) => attrLabel(a).localeCompare(attrLabel(b))),
+  );
+  // colunas dinâmicas = atributos selecionados (também viram colunas, como no legado)
+  const gridTemplate = $derived(GRID + attrSel.map(() => ' 104px').join(''));
 
   // ---- derivação: filtra -> ordena ---------------------------------------------------
   const rows = $derived(deriveRows(items, cur));
@@ -129,6 +137,7 @@
       if (typeF.length && !typeF.includes(r.type)) return false;
       if (gtype.length && !gtype.includes(r.gearType)) return false;
       if (cls.length && !cls.some((c) => r.classes.includes(c))) return false;
+      if (attrSel.length && !attrSel.every((a) => r.item.attrs && a in r.item.attrs)) return false;
       if (lmin != null && !(r.level != null && r.level >= lmin)) return false;
       if (lmax != null && !(r.level != null && r.level <= lmax)) return false;
       if (gmin != null && r.gold < gmin) return false;
@@ -141,10 +150,11 @@
       return true;
     });
   });
-  function sortValue(r: MarketRow, key: SortKey): number | string | null {
+  function sortValue(r: MarketRow, key: string): number | string | null {
     if (key === 'grade') return r.gradeRank;
     if (key === 'classes') return r.classes.join(',');
-    return r[key];
+    if (key.startsWith('attr:')) return r.item.attrs?.[key.slice(5)]?.value ?? null;
+    return r[key as SortKey];
   }
   const sorted = $derived.by(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -174,7 +184,7 @@
   const visible = $derived(sorted.slice(start, end));
   const cardsList = $derived(sorted.slice(0, CARDS_CAP));
 
-  function toggleSort(key: SortKey) {
+  function toggleSort(key: string) {
     if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
     else {
       sortKey = key;
@@ -183,11 +193,11 @@
   }
   function clearFilters() {
     q = lvlMin = lvlMax = goldMin = goldMax = priceMin = priceMax = '';
-    grade = typeF = gtype = cls = [];
+    grade = typeF = gtype = cls = attrSel = [];
     onlyTrad = onlyBook = onlyFav = false;
   }
   const hasFilters = $derived(
-    !!(q || grade.length || typeF.length || gtype.length || cls.length || lvlMin || lvlMax ||
+    !!(q || grade.length || typeF.length || gtype.length || cls.length || attrSel.length || lvlMin || lvlMax ||
       goldMin || goldMax || priceMin || priceMax || onlyTrad || onlyBook || onlyFav),
   );
 
@@ -199,6 +209,7 @@
     if (typeF.length) p.set('type', typeF.join(','));
     if (gtype.length) p.set('gt', gtype.join(','));
     if (cls.length) p.set('cls', cls.join(','));
+    if (attrSel.length) p.set('attr', attrSel.join(','));
     if (lvlMin) p.set('lmin', lvlMin);
     if (lvlMax) p.set('lmax', lvlMax);
     if (goldMin) p.set('gmin', goldMin);
@@ -228,6 +239,7 @@
     <MultiSelect label={msgs.allTypes} options={presentTypes} selected={typeF} onchange={(v) => (typeF = v)} fmt={titleCase} />
     <MultiSelect label={msgs.allGearTypes} options={presentGearTypes} selected={gtype} onchange={(v) => (gtype = v)} fmt={titleCase} />
     <MultiSelect label={msgs.allClasses} options={presentClasses} selected={cls} onchange={(v) => (cls = v)} />
+    <MultiSelect label={msgs.allAttrs} options={presentAttrs} selected={attrSel} onchange={(v) => (attrSel = v)} fmt={attrLabel} />
     <input type="number" bind:value={lvlMin} placeholder={msgs.lvlMin} class="w-20 {fld}" min="0" />
     <input type="number" bind:value={lvlMax} placeholder={msgs.lvlMax} class="w-20 {fld}" min="0" />
     <input type="number" bind:value={goldMin} placeholder={msgs.goldMin} class="w-24 {fld}" min="0" />
@@ -290,11 +302,16 @@
     {#if total > CARDS_CAP}<p class="text-center text-xs text-hint">mostrando {CARDS_CAP} de {total} — refine os filtros ou use a tabela</p>{/if}
   {:else}
     <div class="overflow-x-auto rounded-[10px] border border-line">
-      <div style:min-width="1120px">
-        <div class="grid bg-surface text-[11px] font-semibold text-muted" style:grid-template-columns={GRID}>
+      <div style:min-width={`${1120 + attrSel.length * 104}px`}>
+        <div class="grid bg-surface text-[11px] font-semibold text-muted" style:grid-template-columns={gridTemplate}>
           {#each COLUMNS as col (col.key)}
             <button type="button" onclick={() => toggleSort(col.key)} class="flex items-center gap-1 px-2 py-2 hover:text-ink {col.align === 'right' ? 'justify-end' : 'justify-start'}">
               {msgs.cols[col.key]}{#if sortKey === col.key}<span class="text-accent-bright">{sortDir === 'asc' ? '▲' : '▼'}</span>{/if}
+            </button>
+          {/each}
+          {#each attrSel as a (a)}
+            <button type="button" onclick={() => toggleSort(`attr:${a}`)} class="flex items-center justify-end gap-1 px-2 py-2 hover:text-ink" title={attrLabel(a)}>
+              <span class="truncate">{attrLabel(a)}</span>{#if sortKey === `attr:${a}`}<span class="text-accent-bright">{sortDir === 'asc' ? '▲' : '▼'}</span>{/if}
             </button>
           {/each}
         </div>
@@ -302,7 +319,7 @@
           <div style:height={`${total * ROW_H}px`} style:position="relative">
             <div style:transform={`translateY(${start * ROW_H}px)`}>
               {#each visible as r (r.name)}
-                <div class="tabular grid items-center border-b border-line-soft text-xs hover:bg-row-hover" style:grid-template-columns={GRID} style:height={`${ROW_H}px`}>
+                <div class="tabular grid items-center border-b border-line-soft text-xs hover:bg-row-hover" style:grid-template-columns={gridTemplate} style:height={`${ROW_H}px`}>
                   <div class="flex min-w-0 items-center gap-1.5 px-2">
                     <button type="button" onclick={() => toggleFav(r.name)} title={msgs.fav} class="flex-none leading-none {isFav(r.name) ? 'text-gold' : 'text-hint hover:text-gold'}">★</button>
                     <img src={iconUrl(r.item.icon)} alt="" loading="lazy" class="size-5 flex-none rounded object-contain [image-rendering:pixelated]" style:border={`1px solid ${gradeColor(r.grade)}55`} />
@@ -321,6 +338,9 @@
                   <div class="px-2 text-right text-ink">{fmtPrice(r.buyMax, 'brl')}</div>
                   <div class="px-2 text-right text-[#5fd38d]">{fmtPrice(r.buyNet, 'brl')}</div>
                   <div class="px-2 text-right text-muted">{r.buyOrders || '—'}</div>
+                  {#each attrSel as a (a)}
+                    <div class="truncate px-2 text-right text-ink" title={r.item.attrs?.[a]?.disp ?? ''}>{r.item.attrs?.[a]?.disp ?? '—'}</div>
+                  {/each}
                 </div>
               {/each}
             </div>

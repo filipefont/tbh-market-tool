@@ -45,6 +45,7 @@ export function loadMarketSlim(): MarketLike[] {
     type: d.type,
     gearType: d.gearType,
     classes: d.classes,
+    attrs: d.attrs,
     level: d.level,
     gold: d.gold,
     usd: d.usd,

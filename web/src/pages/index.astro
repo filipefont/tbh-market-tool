@@ -1,33 +1,25 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import StackCheck from '../components/StackCheck.svelte';
+import MercadoTable from '../components/market/MercadoTable.svelte';
+import { loadMarketSlim } from '../lib/data.ts';
+
+// Mercado: o ranking denso é a home do front novo (peça central do produto).
+const items = loadMarketSlim();
 ---
 
-<Layout title="TBH Market — next (Fase 0)">
-  <main class="mx-auto max-w-3xl px-6 py-16">
-    <span
-      class="inline-block rounded-full border border-line bg-surface px-2 py-0.5 text-xs text-muted"
-    >
-      Etapa 4 · Fase 0 · fundação
-    </span>
+<Layout
+  title="Mercado — TBH Market"
+  description="Ranking do mercado do Taskbar Hero: gold por moeda, preço, variação 24h, encomendas e líquido após taxa. Ordenável e filtrável."
+>
+  <main class="mx-auto max-w-6xl px-4 py-6">
+    <header class="mb-4">
+      <h1 class="text-xl font-semibold text-ink">Mercado</h1>
+      <p class="mt-1 text-sm text-muted">
+        {items.length} itens. Ordene por qualquer coluna; <b class="text-ink">Gold/moeda</b> mostra o melhor negócio.
+        Encomendas e líquido (−15% taxa) em <span class="tabular">R$</span>.
+      </p>
+    </header>
 
-    <h1 class="mt-4 text-2xl font-semibold text-ink">
-      TBH Market <span class="text-accent">/next</span>
-    </h1>
-
-    <p class="mt-3 max-w-prose text-sm leading-relaxed text-muted">
-      Esqueleto do novo front-end (Astro + Svelte + Tailwind + TS), publicado lado a
-      lado com o site atual. Sem features ainda — o pipeline Python segue como fonte
-      de dados (<code class="tabular text-link">api/*.json</code>). As abas reais chegam
-      nas próximas fases.
-    </p>
-
-    <div class="mt-8">
-      <StackCheck client:load />
-    </div>
-
-    <p class="mt-3 text-xs text-hint">
-      O botão acima é uma ilha interativa: se o contador sobe, o stack hidratou.
-    </p>
+    <MercadoTable client:only="svelte" {items} />
   </main>
 </Layout>

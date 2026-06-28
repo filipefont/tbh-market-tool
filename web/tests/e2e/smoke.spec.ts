@@ -1,18 +1,16 @@
 import { expect, test } from '@playwright/test';
 
-test('home /next carrega e a ilha Svelte hidrata', async ({ page }) => {
+test('home /next carrega o Mercado e a tabela hidrata', async ({ page }) => {
   await page.goto('./');
 
-  // título da fundação
-  await expect(page.getByRole('heading', { name: /TBH Market/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Mercado' })).toBeVisible();
 
-  // a ilha interativa precisa hidratar e responder ao clique. client:load hidrata
-  // de forma assíncrona, então re-tenta o clique até o estado sair de 0 (cliques
-  // disparados antes da hidratação são perdidos — isso tolera a corrida).
-  const btn = page.getByRole('button', { name: /ilha svelte ativa/i });
-  await expect(btn).toContainText('cliques: 0');
-  await expect(async () => {
-    await btn.click();
-    await expect(btn).not.toContainText('cliques: 0', { timeout: 1000 });
-  }).toPass();
+  // a ilha (client:only) hidratou: toggle de moeda e cabeçalho ordenável existem
+  await expect(page.getByRole('button', { name: /R\$ BRL/ })).toBeVisible();
+  const sortHeader = page.getByRole('button', { name: /Gold\/moeda/ });
+  await expect(sortHeader).toBeVisible();
+
+  // ordenar por uma coluna não quebra (marca a seta na ativa)
+  await sortHeader.click();
+  await expect(sortHeader).toContainText(/[▲▼]/);
 });

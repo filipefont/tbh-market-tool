@@ -1,0 +1,18 @@
+---
+import { GRADE_ORDER, gradeColor } from '../lib/grades.ts';
+
+// Legenda de raridade do Cubo (rara -> comum), com o ponto da cor da grade.
+const grades = [...GRADE_ORDER].reverse();
+const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+---
+
+<ul class="grid grid-cols-2 gap-x-3 gap-y-1 md:grid-cols-1">
+  {
+    grades.map((g) => (
+      <li class="flex items-center gap-2 text-xs text-muted">
+        <i class="inline-block size-2.5 flex-none rounded-[3px]" style={`background:${gradeColor(g)}`} />
+        {titleCase(g)}
+      </li>
+    ))
+  }
+</ul>

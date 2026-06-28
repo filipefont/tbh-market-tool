@@ -17,9 +17,19 @@
     else s.add(v);
     onchange([...s]);
   }
+
+  // fecha o painel ao clicar fora
+  let el: HTMLDetailsElement;
+  $effect(() => {
+    function onDoc(e: MouseEvent) {
+      if (el?.open && !el.contains(e.target as Node)) el.open = false;
+    }
+    document.addEventListener('click', onDoc);
+    return () => document.removeEventListener('click', onDoc);
+  });
 </script>
 
-<details class="relative">
+<details bind:this={el} class="relative">
   <summary
     class="flex cursor-pointer list-none items-center gap-1 rounded-md border border-line bg-field px-2 py-1.5 text-xs whitespace-nowrap text-ink
            {selected.length ? 'border-accent-bright' : ''}"

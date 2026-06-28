@@ -4,6 +4,8 @@ test('home carrega o Mercado e a tabela hidrata', async ({ page }) => {
   await page.goto('./');
 
   await expect(page.getByRole('heading', { name: 'Mercado' })).toBeVisible();
+  // shell do Cubo: sidebar com brand
+  await expect(page.getByText('TBH Market Tool')).toBeVisible();
 
   // a ilha (client:only) hidratou: toggle de moeda e cabeçalho ordenável existem
   await expect(page.getByRole('button', { name: /R\$ BRL/ })).toBeVisible();

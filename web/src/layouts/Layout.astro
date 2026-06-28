@@ -1,12 +1,13 @@
 ---
 import { getAbsoluteLocaleUrl } from 'astro:i18n';
 import '../styles/global.css';
-import SiteNav from '../components/SiteNav.astro';
+import CuboSidebar from '../components/CuboSidebar.astro';
 import { resolveLang } from '../i18n/ui.ts';
 
 interface Props {
   title?: string;
   description?: string;
+  /** false oculta a sidebar do Cubo (raro). */
   nav?: boolean;
 }
 
@@ -42,8 +43,10 @@ const alternates = LOCALIZED.has(path)
     {alternates.map((a) => <link rel="alternate" hreflang={a.hreflang} href={a.href} />)}
     <title>{title}</title>
   </head>
-  <body>
-    {nav && <SiteNav />}
-    <slot />
+  <body class={nav ? 'md:grid md:min-h-screen md:grid-cols-[248px_minmax(0,1fr)]' : ''}>
+    {nav && <CuboSidebar />}
+    <div class="min-w-0">
+      <slot />
+    </div>
   </body>
 </html>

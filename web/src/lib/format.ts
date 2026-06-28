@@ -41,7 +41,7 @@ export function fmtPrice(value: number | null | undefined, cur: Currency): strin
 }
 
 /** Variação 24h do item (em %), se houver. */
-export function delta24(item: MarketItem): number | null {
+export function delta24(item: Pick<MarketItem, 'chg24'>): number | null {
   return item.chg24 ?? null;
 }
 

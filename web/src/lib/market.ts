@@ -9,13 +9,16 @@ export type MarketLike = Pick<
   | 'key'
   | 'grade'
   | 'gradeRank'
+  | 'type'
   | 'gearType'
+  | 'classes'
   | 'level'
   | 'gold'
   | 'usd'
   | 'listings'
   | 'icon'
   | 'chg24'
+  | 'chg7'
   | 'real'
   | 'book'
   | 'gradeLock'
@@ -53,16 +56,21 @@ export interface MarketRow {
   name: string;
   grade: string;
   gradeRank: number;
+  type: string;
   gearType: string;
+  classes: string[];
   level: number | null;
   gold: number;
   price: number | null;
   chg24: number | null;
+  chg7: number | null;
   goldPer: number | null;
   listings: number;
+  vol: number | null;
   buyMax: number | null;
   buyNet: number | null;
   buyOrders: number;
+  tradable: boolean;
 }
 
 /** Deriva as linhas da tabela na moeda escolhida. */
@@ -74,16 +82,21 @@ export function deriveRows(items: MarketLike[], cur: Currency): MarketRow[] {
       name: item.name,
       grade: item.grade,
       gradeRank: item.gradeRank,
+      type: item.type ?? '',
       gearType: item.gearType ?? '',
+      classes: item.classes ?? [],
       level: item.level,
       gold: item.gold,
       price: priceOf(item, cur),
       chg24: item.chg24 ?? null,
+      chg7: item.chg7 ?? null,
       goldPer: goldPer(item, cur),
       listings: item.listings,
+      vol: item.real?.brl?.vol ?? null,
       buyMax: bm,
       buyNet: netAfterFee(bm),
       buyOrders: buyOrders(item),
+      tradable: item.tradable,
     };
   });
 }

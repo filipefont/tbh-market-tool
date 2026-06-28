@@ -1,14 +1,14 @@
 <script lang="ts">
-  import type { MarketItem } from '../../lib/contract/index.ts';
   import { type Currency, currencySymbol, delta24, fmtAbbr, fmtPrice, iconUrl, priceOf } from '../../lib/format.ts';
   import { gradeColor } from '../../lib/grades.ts';
+  import type { MarketLike } from '../../lib/market.ts';
   import Badge from './Badge.svelte';
   import Delta from './Delta.svelte';
   import GradeBadge from './GradeBadge.svelte';
 
   // Card de item do Cubo (portado de cuboCardHtml -> Tailwind + contrato).
   interface Props {
-    item: MarketItem;
+    item: MarketLike;
     rank?: number;
     currency?: Currency;
   }

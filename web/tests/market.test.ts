@@ -7,6 +7,8 @@ const item = (over: Partial<MarketLike> = {}): MarketLike => ({
   key: 1,
   grade: 'ARCANA',
   gradeRank: 5,
+  type: 'GEAR',
+  classes: [],
   gearType: 'SWORD',
   level: 10,
   gold: 1000,

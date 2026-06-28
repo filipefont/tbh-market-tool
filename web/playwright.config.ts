@@ -1,11 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
 // E2E mínimo da Fase 0: builda + serve o site estático e valida no Chromium.
-// Roda no CI como rede de segurança da migração. base do site = /tbh-market-tool/next.
+// Roda no CI como rede de segurança da migração. base do site = /tbh-market-tool.
 const PORT = 4321;
-// barra final é importante: com `goto('./')`, a URL resolve p/ o próprio base
-// (sem ela, `./` dropa o segmento `next` e cai no caminho do site legado).
-const BASE = `http://localhost:${PORT}/tbh-market-tool/next/`;
+// barra final é importante: com `goto('./')`, a URL resolve p/ o próprio base.
+const BASE = `http://localhost:${PORT}/tbh-market-tool/`;
 
 export default defineConfig({
   testDir: './tests/e2e',

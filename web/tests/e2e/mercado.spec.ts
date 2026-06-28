@@ -17,3 +17,21 @@ test('Mercado: toggle de cartões e filtros funcionam', async ({ page }) => {
   await page.getByRole('button', { name: /limpar/ }).click();
   await expect(page.getByRole('button', { name: /limpar/ })).toHaveCount(0);
 });
+
+test('Mercado: faceta multi-seleção e favoritos', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.getByRole('button', { name: /R\$ BRL/ })).toBeVisible();
+
+  // faceta "categoria" (multi-seleção via <details>)
+  const facet = page.locator('details', { hasText: 'categoria' });
+  await facet.locator('summary').click();
+  await facet.getByRole('checkbox').first().check();
+  await facet.locator('summary').click(); // fecha o painel (não sobrepor os controles)
+  await expect(page.getByRole('button', { name: /limpar/ })).toBeVisible();
+  await page.getByRole('button', { name: /limpar/ }).click();
+
+  // favoritar a 1ª linha e filtrar por favoritos
+  await page.locator('button[title="favoritar"]').first().click();
+  await page.locator('label', { hasText: 'favoritos' }).getByRole('checkbox').check();
+  await expect(page.locator('a[href*="/item/"]').first()).toBeVisible();
+});

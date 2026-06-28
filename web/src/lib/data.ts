@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { CraftData, History, MarketData, StagesData } from './contract/index.ts';
+import type { MarketLike } from './market.ts';
 
 // Carregadores de dados em build-time (SSG). Lêem os api/*.json gerados pelo
 // pipeline Python (presentes no deploy e no dev local). Quando ausentes — ex.:
@@ -33,3 +34,23 @@ export const loadHistory = (): History => load<History>('history.json');
 
 /** Itens que têm efeitos (fonte da aba Efeitos). */
 export const loadGems = (): MarketData => loadMarket().filter((d) => d.effects && d.effects.length > 0);
+
+/** Projeção enxuta do mercado p/ embutir no Mercado (só os campos da tabela/hero). */
+export function loadMarketSlim(): MarketLike[] {
+  return loadMarket().map((d) => ({
+    name: d.name,
+    grade: d.grade,
+    gradeRank: d.gradeRank,
+    gearType: d.gearType,
+    level: d.level,
+    gold: d.gold,
+    usd: d.usd,
+    listings: d.listings,
+    icon: d.icon,
+    chg24: d.chg24,
+    real: d.real,
+    book: d.book,
+    gradeLock: d.gradeLock,
+    tradable: d.tradable,
+  }));
+}

@@ -25,8 +25,11 @@ export function fmtAbbr(n: number | null | undefined): string {
   return String(Math.round(n));
 }
 
+/** Campos mínimos p/ derivar preço — aceita o item completo ou a projeção enxuta. */
+export type PriceLike = Pick<MarketItem, 'real' | 'usd'>;
+
 /** Preço do item na moeda escolhida (BRL = encomenda/real; USD = estimativa). */
-export function priceOf(item: MarketItem, cur: Currency): number | null {
+export function priceOf(item: PriceLike, cur: Currency): number | null {
   if (cur === 'brl') return item.real?.brl?.low ?? null;
   return item.usd ?? null;
 }

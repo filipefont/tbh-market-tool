@@ -1,0 +1,23 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import EffectCard from '../ds/EffectCard.svelte';
+import { loadGems } from '../../lib/data.ts';
+import { resolveLang, useTranslations } from '../../i18n/ui.ts';
+
+const lang = resolveLang(Astro.currentLocale);
+const t = useTranslations(lang);
+const gems = loadGems().sort((a, b) => a.name.localeCompare(b.name));
+---
+
+<Layout title={`${t('effects.title')} — TBH Market`} description={t('effects.subtitle')}>
+  <main class="mx-auto max-w-5xl px-4 py-8">
+    <header class="mb-5">
+      <h1 class="text-xl font-semibold text-ink">{t('effects.title')}</h1>
+      <p class="mt-1 text-sm text-muted">{gems.length} {t('effects.subtitle')}</p>
+    </header>
+
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {gems.map((item) => <EffectCard item={item} />)}
+    </div>
+  </main>
+</Layout>

@@ -1,38 +1,71 @@
 ---
-// Navegação entre as abas (rotas estáticas, SEO-ready). Marca a ativa pela URL.
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
-const here = Astro.url.pathname.replace(/\/$/, '');
+import { getRelativeLocaleUrl } from 'astro:i18n';
+import { languages, resolveLang, useTranslations, type Lang, type UIKey } from '../i18n/ui.ts';
 
-const LINKS: { href: string; label: string }[] = [
-  { href: `${base}`, label: '◆ Ranking' },
-  { href: `${base}/efeitos`, label: '✦ Efeitos' },
-  { href: `${base}/farm`, label: '⛏ Farm' },
-  { href: `${base}/craft`, label: '⚒ Craft' },
+// Navegação entre as abas (rotas estáticas, SEO-ready) + seletor de idioma.
+// Links e rótulos respeitam o idioma atual (Astro.currentLocale).
+const lang = resolveLang(Astro.currentLocale);
+const t = useTranslations(lang);
+
+const NAV: { path: string; key: UIKey }[] = [
+  { path: '', key: 'nav.ranking' },
+  { path: 'efeitos', key: 'nav.effects' },
+  { path: 'farm', key: 'nav.farm' },
+  { path: 'craft', key: 'nav.craft' },
 ];
 
-const isActive = (href: string) => here === href.replace(/\/$/, '');
+// caminho lógico atual (sem base nem prefixo de locale) p/ marcar o ativo + trocar idioma
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const path = Astro.url.pathname
+  .replace(base, '')
+  .replace(/^\/(en)(?=\/|$)/, '')
+  .replace(/^\/+|\/+$/g, '');
+// rotas com versão localizada (p/ o seletor não cair em 404; ex.: /item é só PT)
+const LOCALIZED = new Set(['', 'efeitos', 'farm', 'craft']);
+const switchPath = LOCALIZED.has(path) ? path : '';
+
+const home = getRelativeLocaleUrl(lang, '');
 ---
 
 <header class="sticky top-0 z-10 border-b border-line bg-surface/95 backdrop-blur">
-  <nav class="mx-auto flex max-w-5xl flex-wrap items-center gap-1 px-4 py-2">
-    <a href={`${base}`} class="mr-3 text-sm font-semibold text-ink">
+  <nav class="mx-auto flex max-w-6xl flex-wrap items-center gap-1 px-4 py-2">
+    <a href={home} class="mr-3 text-sm font-semibold text-ink">
       TBH Market <span class="text-accent">/next</span>
     </a>
     {
-      LINKS.map((l) => (
-        <a
-          href={l.href}
-          aria-current={isActive(l.href) ? 'page' : undefined}
-          class:list={[
-            'rounded-md px-2.5 py-1 text-xs transition-colors',
-            isActive(l.href)
-              ? 'bg-accent/15 text-ink'
-              : 'text-muted hover:bg-row-hover hover:text-ink',
-          ]}
-        >
-          {l.label}
-        </a>
-      ))
+      NAV.map((l) => {
+        const href = getRelativeLocaleUrl(lang, l.path);
+        const active = path === l.path;
+        return (
+          <a
+            href={href}
+            aria-current={active ? 'page' : undefined}
+            class:list={[
+              'rounded-md px-2.5 py-1 text-xs transition-colors',
+              active ? 'bg-accent/15 text-ink' : 'text-muted hover:bg-row-hover hover:text-ink',
+            ]}
+          >
+            {t(l.key)}
+          </a>
+        );
+      })
     }
+
+    <div class="ml-auto flex items-center gap-1" aria-label={t('nav.lang')}>
+      {
+        (Object.keys(languages) as Lang[]).map((lng) => (
+          <a
+            href={getRelativeLocaleUrl(lng, switchPath)}
+            aria-current={lng === lang ? 'true' : undefined}
+            class:list={[
+              'rounded px-1.5 py-0.5 text-[11px] uppercase transition-colors',
+              lng === lang ? 'bg-accent/15 text-ink' : 'text-muted hover:text-ink',
+            ]}
+          >
+            {lng}
+          </a>
+        ))
+      }
+    </div>
   </nav>
 </header>

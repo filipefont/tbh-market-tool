@@ -1,25 +1,5 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import MercadoTable from '../components/market/MercadoTable.svelte';
-import { loadMarketSlim } from '../lib/data.ts';
-
-// Mercado: o ranking denso é a home do front novo (peça central do produto).
-const items = loadMarketSlim();
+import MercadoView from '../components/pages/MercadoView.astro';
 ---
 
-<Layout
-  title="Mercado — TBH Market"
-  description="Ranking do mercado do Taskbar Hero: gold por moeda, preço, variação 24h, encomendas e líquido após taxa. Ordenável e filtrável."
->
-  <main class="mx-auto max-w-6xl px-4 py-6">
-    <header class="mb-4">
-      <h1 class="text-xl font-semibold text-ink">Mercado</h1>
-      <p class="mt-1 text-sm text-muted">
-        {items.length} itens. Ordene por qualquer coluna; <b class="text-ink">Gold/moeda</b> mostra o melhor negócio.
-        Encomendas e líquido (−15% taxa) em <span class="tabular">R$</span>.
-      </p>
-    </header>
-
-    <MercadoTable client:only="svelte" {items} />
-  </main>
-</Layout>
+<MercadoView />

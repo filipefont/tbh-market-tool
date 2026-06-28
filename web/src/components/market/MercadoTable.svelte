@@ -9,28 +9,36 @@
 
   // Tabela densa do Mercado (Fase 3). Ordenação/filtro/busca com runes; estado na
   // URL; virtualização manual (windowing de altura fixa) p/ as ~900 linhas.
-  interface Props {
-    items: MarketLike[];
-  }
-  let { items }: Props = $props();
-
   type SortKey =
     | 'name' | 'grade' | 'gearType' | 'level' | 'gold' | 'price'
     | 'chg24' | 'goldPer' | 'listings' | 'buyMax' | 'buyNet' | 'buyOrders';
 
-  const COLUMNS: { key: SortKey; label: string; align: 'left' | 'right' }[] = [
-    { key: 'name', label: 'Item', align: 'left' },
-    { key: 'grade', label: 'Grade', align: 'left' },
-    { key: 'gearType', label: 'Tipo', align: 'left' },
-    { key: 'level', label: 'Lvl', align: 'right' },
-    { key: 'gold', label: 'Gold', align: 'right' },
-    { key: 'price', label: 'Preço', align: 'right' },
-    { key: 'chg24', label: 'Δ24h', align: 'right' },
-    { key: 'goldPer', label: 'Gold/moeda', align: 'right' },
-    { key: 'listings', label: 'List.', align: 'right' },
-    { key: 'buyMax', label: 'Maior enc.', align: 'right' },
-    { key: 'buyNet', label: 'Líquido', align: 'right' },
-    { key: 'buyOrders', label: 'Encom.', align: 'right' },
+  // strings traduzidas vêm da página (Astro.currentLocale) — o island não acessa i18n.
+  interface Msgs {
+    search: string;
+    allGrades: string;
+    items: string;
+    cols: Record<SortKey, string>;
+  }
+  interface Props {
+    items: MarketLike[];
+    msgs: Msgs;
+  }
+  let { items, msgs }: Props = $props();
+
+  const COLUMNS: { key: SortKey; align: 'left' | 'right' }[] = [
+    { key: 'name', align: 'left' },
+    { key: 'grade', align: 'left' },
+    { key: 'gearType', align: 'left' },
+    { key: 'level', align: 'right' },
+    { key: 'gold', align: 'right' },
+    { key: 'price', align: 'right' },
+    { key: 'chg24', align: 'right' },
+    { key: 'goldPer', align: 'right' },
+    { key: 'listings', align: 'right' },
+    { key: 'buyMax', align: 'right' },
+    { key: 'buyNet', align: 'right' },
+    { key: 'buyOrders', align: 'right' },
   ];
   const GRID = 'minmax(180px,2fr) 96px 90px 52px 78px 92px 74px 104px 60px 96px 96px 78px';
   const ROW_H = 36;
@@ -118,20 +126,20 @@
     <input
       type="search"
       bind:value={q}
-      placeholder="buscar item…"
+      placeholder={msgs.search}
       class="w-48 rounded-md border border-line bg-field px-3 py-1.5 text-sm text-ink focus-visible:outline-2 focus-visible:outline-accent-bright"
     />
     <select
       bind:value={gradeFilter}
       class="rounded-md border border-line bg-field px-2 py-1.5 text-sm text-ink focus-visible:outline-2 focus-visible:outline-accent-bright"
     >
-      <option value="">todas as grades</option>
+      <option value="">{msgs.allGrades}</option>
       {#each presentGrades as g (g)}
         <option value={g}>{g.charAt(0) + g.slice(1).toLowerCase()}</option>
       {/each}
     </select>
     <CurrencyToggle value={cur} onchange={(c) => (cur = c)} />
-    <span class="tabular ml-auto text-xs text-muted">{total} itens</span>
+    <span class="tabular ml-auto text-xs text-muted">{total} {msgs.items}</span>
   </div>
 
   <!-- hero: melhor da ordenação atual -->
@@ -166,7 +174,7 @@
             onclick={() => toggleSort(col.key)}
             class="flex items-center gap-1 px-2 py-2 hover:text-ink {col.align === 'right' ? 'justify-end' : 'justify-start'}"
           >
-            {col.label}
+            {msgs.cols[col.key]}
             {#if sortKey === col.key}<span class="text-accent-bright">{sortDir === 'asc' ? '▲' : '▼'}</span>{/if}
           </button>
         {/each}

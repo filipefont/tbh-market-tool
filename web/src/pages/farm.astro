@@ -1,30 +1,5 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import StageCard from '../components/ds/StageCard.svelte';
-import { loadMarket, loadStages } from '../lib/data.ts';
-
-// Aba Farm: estágios, drops e valor tradável esperado por caixa (EV). SSG.
-// Cruza os drops com o mercado p/ anotar o preço USD dos itens tradáveis.
-const stages = loadStages().sort((a, b) => (b.ev || 0) - (a.ev || 0));
-const prices: Record<string, number | null> = {};
-for (const item of loadMarket()) prices[item.name] = item.usd ?? null;
+import FarmView from '../components/pages/FarmView.astro';
 ---
 
-<Layout
-  title="Farm — TBH Market"
-  description="Onde farmar no Taskbar Hero: estágios, drops por raridade e o valor tradável esperado por caixa."
->
-  <main class="mx-auto max-w-5xl px-4 py-8">
-    <header class="mb-5">
-      <h1 class="text-xl font-semibold text-ink">Farm</h1>
-      <p class="mt-1 max-w-prose text-sm text-muted">
-        {stages.length} estágios, ordenados pelo valor tradável esperado por caixa (EV, em
-        <span class="tabular">USD</span>).
-      </p>
-    </header>
-
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {stages.map((stage) => <StageCard stage={stage} prices={prices} />)}
-    </div>
-  </main>
-</Layout>
+<FarmView />

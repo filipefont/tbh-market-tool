@@ -39,14 +39,23 @@ export function netAfterFee(buyMax: number | null | undefined): number | null {
   return buyMax == null ? null : buyMax * (1 - STEAM_FEE);
 }
 
-/** Maior encomenda ativa (buy order) em BRL — dado real do order book. */
+// Moeda do order book (encomendas): hoje a Steam devolve o lado de compra em USD.
+// O frontend exibe os valores de encomenda nessa moeda.
+export const BOOK_CUR: Currency = 'usd';
+
+/** Lado de compra (encomendas) do order book — prefere USD; cai p/ BRL legado. */
+function bookSide(item: MarketLike) {
+  return item.book?.usd ?? item.book?.brl ?? null;
+}
+
+/** Maior encomenda ativa (buy order) — dado real do order book (BOOK_CUR). */
 export function buyMax(item: MarketLike): number | null {
-  return item.book?.brl?.buyMax ?? null;
+  return bookSide(item)?.buyMax ?? null;
 }
 
 /** Total de encomendas (demanda agregada). */
 export function buyOrders(item: MarketLike): number {
-  return item.book?.brl?.buyOrders ?? 0;
+  return bookSide(item)?.buyOrders ?? 0;
 }
 
 /** Gold por unidade de moeda (gold ÷ preço) — quanto gold cada 1 R$/$ compra. */

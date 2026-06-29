@@ -7,7 +7,7 @@ import Badge from '../../components/ds/Badge.svelte';
 import PriceChart from '../../components/ds/PriceChart.svelte';
 import { loadHistory, loadMarket } from '../../lib/data.ts';
 import { buildSlugMap } from '../../lib/slug.ts';
-import { fmtAbbr, fmtPrice, iconUrl } from '../../lib/format.ts';
+import { fmtAbbr, fmtPrice, iconUrl, steamUrl } from '../../lib/format.ts';
 import { gradeColor } from '../../lib/grades.ts';
 import { attrLabel } from '../../lib/labels.ts';
 import { buyMax, buyOrders, goldPer, netAfterFee } from '../../lib/market.ts';
@@ -62,6 +62,18 @@ const stats: { label: string; value: string; accent?: boolean }[] = [
           {item.gradeLock && <Badge variant="lock" title="intradável pela trava de grade">🔒 trava</Badge>}
           {!item.tradable && <Badge variant="lock">intradável</Badge>}
           <Delta pct={item.chg24 ?? null} suffix="24h" />
+          {
+            item.tradable && (
+              <a
+                href={steamUrl(item.name)}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="rounded-md border border-line bg-field px-2 py-1 text-xs text-muted hover:border-accent-bright hover:text-ink"
+              >
+                ↗ Mercado Steam
+              </a>
+            )
+          }
         </div>
       </div>
     </header>

@@ -2,6 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import MarketFilters from '../market/MarketFilters.svelte';
 import MercadoTable from '../market/MercadoTable.svelte';
+import Freshness from '../market/Freshness.svelte';
 import { loadMarket, loadMarketSlim } from '../../lib/data.ts';
 import { GRADE_ORDER } from '../../lib/grades.ts';
 import { attrLabel } from '../../lib/labels.ts';
@@ -22,14 +23,13 @@ const options = {
   attrs: present(items.flatMap((it) => Object.keys(it.attrs ?? {}))).sort((a, b) => attrLabel(a).localeCompare(attrLabel(b))) as string[],
 };
 
-// frescor dos dados (maior fetchedAt de preço real/encomenda)
+// frescor dos dados (maior fetchedAt de preço real/encomenda). A formatação fica
+// no island Freshness (cliente), p/ idade relativa correta e fuso BRT — formatar
+// aqui (build em UTC no CI) mostrava a hora/dia errados.
 let maxFetched = 0;
 for (const it of full) {
   maxFetched = Math.max(maxFetched, it.real?.brl?.fetchedAt ?? 0, it.book?.brl?.fetchedAt ?? 0);
 }
-const updatedAt = maxFetched
-  ? new Date(maxFetched * 1000).toLocaleString(lang === 'pt' ? 'pt-BR' : 'en-US', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-  : null;
 
 const filterMsgs = {
   search: t('mercado.search'),
@@ -77,7 +77,7 @@ const bagHref = `${import.meta.env.BASE_URL.replace(/\/$/, '')}${lang === 'pt' ?
         <p class="mt-1 text-sm text-muted">{items.length} {t('mercado.items')}. {t('mercado.subtitle')}</p>
       </div>
       <div class="flex items-center gap-3 text-xs text-hint">
-        {updatedAt && <span>↻ {updatedAt}</span>}
+        {maxFetched > 0 && <Freshness epoch={maxFetched} lang={lang} client:only="svelte" />}
         <a href={bagHref} class="rounded-md border border-line bg-field px-2.5 py-1.5 text-muted hover:text-ink">{t('nav.bag')}</a>
       </div>
     </header>

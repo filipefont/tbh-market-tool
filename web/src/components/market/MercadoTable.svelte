@@ -55,9 +55,11 @@
   ];
   // colunas oferecidas no seletor de ordenação (visão de cards/qualquer)
   const SORT_KEYS: SortKey[] = ['goldPer', 'price', 'gold', 'chg24', 'listings', 'buyMax', 'name', 'grade', 'level'];
+  // larguras generosas, fiéis à densidade da tabela do Cubo (linhas altas, fontes
+  // 13px, Gold/moeda largo p/ a barra de proporção).
   const GRID =
-    'minmax(180px,2fr) 96px 84px 80px 50px 74px 86px 70px 96px 56px 64px 88px 88px 72px';
-  const ROW_H = 36;
+    'minmax(220px,2.2fr) 104px 100px 100px 58px 92px 100px 80px 128px 66px 76px 104px 104px 86px';
+  const ROW_H = 46;
   const OVERSCAN = 8;
   const CARDS_CAP = 120;
 
@@ -135,6 +137,8 @@
   const cardsList = $derived(sorted.slice(0, CARDS_CAP));
   const attrCols = $derived(ms.attr);
   const gridTemplate = $derived(GRID + attrCols.map(() => ' 104px').join(''));
+  // maior gold/moeda da seleção — base da barra de proporção (coluna Gold/moeda)
+  const maxGoldPer = $derived(Math.max(1, ...filtered.map((r) => r.goldPer ?? 0)));
 
   function toggleSort(key: string) {
     if (ms.sortKey === key) sortDirA.set(ms.sortDir === 'asc' ? 'desc' : 'asc');
@@ -227,10 +231,10 @@
     {#if total > CARDS_CAP}<p class="text-center text-xs text-hint">mostrando {CARDS_CAP} de {total} — refine os filtros ou use a tabela</p>{/if}
   {:else}
     <div class="overflow-x-auto rounded-[10px] border border-line">
-      <div style:min-width={`${1120 + attrCols.length * 104}px`}>
-        <div class="grid bg-surface text-[11px] font-semibold text-muted" style:grid-template-columns={gridTemplate}>
+      <div style:min-width={`${1418 + attrCols.length * 104}px`}>
+        <div class="grid bg-surface text-xs font-semibold text-muted" style:grid-template-columns={gridTemplate}>
           {#each COLUMNS as col (col.key)}
-            <button type="button" onclick={() => toggleSort(col.key)} class="flex items-center gap-1 px-2 py-2 hover:text-ink {col.align === 'right' ? 'justify-end' : 'justify-start'}">
+            <button type="button" onclick={() => toggleSort(col.key)} class="flex items-center gap-1 px-2.5 py-2.5 hover:text-ink {col.align === 'right' ? 'justify-end' : 'justify-start'}">
               {msgs.cols[col.key]}{#if ms.sortKey === col.key}<span class="text-accent-bright">{ms.sortDir === 'asc' ? '▲' : '▼'}</span>{/if}
             </button>
           {/each}
@@ -244,10 +248,10 @@
           <div style:height={`${total * ROW_H}px`} style:position="relative">
             <div style:transform={`translateY(${start * ROW_H}px)`}>
               {#each visible as r (r.name)}
-                <div class="tabular grid items-center border-b border-line-soft text-xs hover:bg-row-hover" style:grid-template-columns={gridTemplate} style:height={`${ROW_H}px`}>
-                  <div class="flex min-w-0 items-center gap-1.5 px-2">
+                <div class="tabular grid items-center border-b border-line-soft text-[13px] hover:bg-row-hover" style:grid-template-columns={gridTemplate} style:height={`${ROW_H}px`}>
+                  <div class="flex min-w-0 items-center gap-2 px-2.5">
                     <button type="button" onclick={() => toggleFav(r.name)} title="favoritar" class="flex-none leading-none {isFav(r.name) ? 'text-gold' : 'text-hint hover:text-gold'}">★</button>
-                    <img src={iconUrl(r.item.icon)} alt="" loading="lazy" class="size-5 flex-none rounded object-contain [image-rendering:pixelated]" style:border={`1px solid ${gradeColor(r.grade)}55`} />
+                    <img src={iconUrl(r.item.icon)} alt="" loading="lazy" class="size-7 flex-none rounded object-contain [image-rendering:pixelated]" style:border={`1px solid ${gradeColor(r.grade)}55`} />
                     <a href={itemHref(r.name)} class="truncate text-ink hover:text-accent hover:underline">{r.item.base || r.name}</a>
                     {#if r.tradable}
                       <a href={steamUrl(r.name)} target="_blank" rel="noopener noreferrer" title="abrir no Mercado Steam" aria-label="abrir no Mercado Steam" class="flex-none text-hint hover:text-accent">↗</a>
@@ -260,7 +264,10 @@
                   <div class="px-2 text-right text-gold">{fmtAbbr(r.gold)}</div>
                   <div class="px-2 text-right text-ink">{money(r.price)}</div>
                   <div class="flex justify-end px-2"><Delta pct={r.chg24} /></div>
-                  <div class="px-2 text-right font-semibold text-accent">{fmtAbbr(r.goldPer)}</div>
+                  <div class="relative flex items-center justify-end overflow-hidden px-2.5 font-semibold text-accent">
+                    <span class="absolute inset-y-[7px] left-0 rounded-r-sm" style:width={`${Math.round(((r.goldPer ?? 0) / maxGoldPer) * 100)}%`} style:background="linear-gradient(90deg,#2dd4a733,#2dd4a70d)"></span>
+                    <span class="relative">{fmtAbbr(r.goldPer)}</span>
+                  </div>
                   <div class="px-2 text-right text-muted">{r.listings}</div>
                   <div class="px-2 text-right text-muted">{r.vol != null ? fmtAbbr(r.vol) : '—'}</div>
                   <div class="px-2 text-right text-ink">{fmtPrice(r.buyMax, BOOK_CUR)}</div>

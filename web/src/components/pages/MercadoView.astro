@@ -1,6 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import MarketFilters from '../market/MarketFilters.svelte';
+import MarketSearch from '../market/MarketSearch.svelte';
 import MercadoTable from '../market/MercadoTable.svelte';
 import Freshness from '../market/Freshness.svelte';
 import { loadMarket, loadMarketSlim } from '../../lib/data.ts';
@@ -68,6 +69,7 @@ const bagHref = `${import.meta.env.BASE_URL.replace(/\/$/, '')}${lang === 'pt' ?
 ---
 
 <Layout title={`${t('mercado.title')} — TBH Market`} description={t('mercado.subtitle')}>
+  <MarketSearch slot="search" client:only="svelte" placeholder={filterMsgs.search} />
   <MarketFilters slot="filters" client:only="svelte" options={options} msgs={filterMsgs} />
 
   <Fragment slot="topbar">

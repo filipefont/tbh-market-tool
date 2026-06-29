@@ -26,6 +26,8 @@ const switchPath = LOCALIZED.has(path) ? path : '';
   class="border-b border-line-soft bg-sidebar px-4 py-4 md:sticky md:top-0 md:self-start md:border-r md:border-b-0"
 >
   <!-- brand agora vive na barra superior (Layout) -->
+  {Astro.slots.has('search') && <div class="mb-4"><slot name="search" /></div>}
+
   <div>
     <div class="mb-2 text-[10px] tracking-wider text-hint uppercase">{t('nav.sectionNav')}</div>
     <nav class="flex flex-wrap gap-1 md:flex-col" aria-label="seções">

@@ -2,7 +2,7 @@
   import { type Currency, deltaColor, fmtAbbr, fmtPrice, iconUrl, steamUrl } from '../../lib/format.ts';
   import { gradeColor } from '../../lib/grades.ts';
   import { attrLabel } from '../../lib/labels.ts';
-  import { type MarketLike, type MarketRow, deriveRows } from '../../lib/market.ts';
+  import { BOOK_CUR, type MarketLike, type MarketRow, deriveRows } from '../../lib/market.ts';
   import { slugify } from '../../lib/slug.ts';
   import { curA, sortDirA, sortKeyA, viewA, toggleFav, wireUrlSync } from '../../lib/stores/market.ts';
   import { ms } from '../../lib/stores/marketState.svelte.ts';
@@ -147,8 +147,8 @@
 </script>
 
 <div class="space-y-3">
-  <!-- controles de apresentação (barra centralizada, fiel ao Cubo) -->
-  <div class="flex flex-wrap items-center justify-center gap-2">
+  <!-- controles de apresentação (barra à direita, fiel ao #marketControls do Cubo) -->
+  <div class="flex flex-wrap items-center justify-end gap-2">
     <div class="inline-flex overflow-hidden rounded-md border border-line" role="group">
       <button type="button" aria-pressed={ms.view === 'cards'} onclick={() => viewA.set('cards')} class="px-2.5 py-1.5 text-xs {ms.view === 'cards' ? 'bg-accent text-accent-ink font-semibold' : 'bg-field text-muted hover:bg-row-hover'}">{msgs.viewCards}</button>
       <button type="button" aria-pressed={ms.view === 'table'} onclick={() => viewA.set('table')} class="px-2.5 py-1.5 text-xs {ms.view === 'table' ? 'bg-accent text-accent-ink font-semibold' : 'bg-field text-muted hover:bg-row-hover'}">{msgs.viewTable}</button>
@@ -263,8 +263,8 @@
                   <div class="px-2 text-right font-semibold text-accent">{fmtAbbr(r.goldPer)}</div>
                   <div class="px-2 text-right text-muted">{r.listings}</div>
                   <div class="px-2 text-right text-muted">{r.vol != null ? fmtAbbr(r.vol) : '—'}</div>
-                  <div class="px-2 text-right text-ink">{fmtPrice(r.buyMax, 'brl')}</div>
-                  <div class="px-2 text-right text-[#5fd38d]">{fmtPrice(r.buyNet, 'brl')}</div>
+                  <div class="px-2 text-right text-ink">{fmtPrice(r.buyMax, BOOK_CUR)}</div>
+                  <div class="px-2 text-right text-[#5fd38d]">{fmtPrice(r.buyNet, BOOK_CUR)}</div>
                   <div class="px-2 text-right text-muted">{r.buyOrders || '—'}</div>
                   {#each attrCols as a (a)}
                     <div class="truncate px-2 text-right text-ink" title={r.item.attrs?.[a]?.disp ?? ''}>{r.item.attrs?.[a]?.disp ?? '—'}</div>

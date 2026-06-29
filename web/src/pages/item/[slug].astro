@@ -10,7 +10,7 @@ import { buildSlugMap } from '../../lib/slug.ts';
 import { fmtAbbr, fmtPrice, iconUrl, steamUrl } from '../../lib/format.ts';
 import { gradeColor } from '../../lib/grades.ts';
 import { attrLabel } from '../../lib/labels.ts';
-import { buyMax, buyOrders, goldPer, netAfterFee } from '../../lib/market.ts';
+import { BOOK_CUR, buyMax, buyOrders, goldPer, netAfterFee } from '../../lib/market.ts';
 
 // Uma página estática por item (SEO). getStaticPaths emite ~900 rotas.
 export const getStaticPaths = (() => {
@@ -35,8 +35,8 @@ const stats: { label: string; value: string; accent?: boolean }[] = [
   { label: 'Preço (US$)', value: fmtPrice(item.usd, 'usd') },
   { label: 'Gold / R$', value: fmtAbbr(goldPer(item, 'brl')), accent: true },
   { label: 'Listagens', value: String(item.listings) },
-  { label: 'Maior enc. (R$)', value: fmtPrice(bm, 'brl') },
-  { label: 'Líquido −15% (R$)', value: fmtPrice(netAfterFee(bm), 'brl') },
+  { label: 'Maior enc. (US$)', value: fmtPrice(bm, BOOK_CUR) },
+  { label: 'Líquido −15% (US$)', value: fmtPrice(netAfterFee(bm), BOOK_CUR) },
   { label: 'Encomendas', value: String(buyOrders(item) || '—') },
 ];
 ---

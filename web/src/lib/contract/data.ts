@@ -34,11 +34,14 @@ export interface Attr {
     disp:  string;
 }
 
+// O order book (encomendas) hoje vem em USD (`book.usd`); `brl` fica opcional p/
+// compatibilidade com dados antigos. Ambos têm a mesma forma.
 export interface Book {
-    brl: BookBrl;
+    usd?: BookSide;
+    brl?: BookSide;
 }
 
-export interface BookBrl {
+export interface BookSide {
     buyMax:      number | null;
     buyOrders:   number;
     sellMin:     number | null;

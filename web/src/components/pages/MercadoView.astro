@@ -28,7 +28,7 @@ const options = {
 // aqui (build em UTC no CI) mostrava a hora/dia errados.
 let maxFetched = 0;
 for (const it of full) {
-  maxFetched = Math.max(maxFetched, it.real?.brl?.fetchedAt ?? 0, it.book?.brl?.fetchedAt ?? 0);
+  maxFetched = Math.max(maxFetched, it.real?.brl?.fetchedAt ?? 0, it.book?.usd?.fetchedAt ?? 0);
 }
 
 const filterMsgs = {
@@ -70,16 +70,15 @@ const bagHref = `${import.meta.env.BASE_URL.replace(/\/$/, '')}${lang === 'pt' ?
 <Layout title={`${t('mercado.title')} — TBH Market`} description={t('mercado.subtitle')}>
   <MarketFilters slot="filters" client:only="svelte" options={options} msgs={filterMsgs} />
 
-  <main class="mx-auto max-w-6xl px-4 py-6">
-    <header class="mb-4 flex flex-wrap items-end justify-between gap-2">
-      <div>
-        <h1 class="display text-2xl font-semibold text-ink">{t('mercado.title')}</h1>
-        <p class="mt-1 text-sm text-muted">{items.length} {t('mercado.items')}. {t('mercado.subtitle')}</p>
-      </div>
-      <div class="flex items-center gap-3 text-xs text-hint">
-        {maxFetched > 0 && <Freshness epoch={maxFetched} lang={lang} client:only="svelte" />}
-        <a href={bagHref} class="rounded-md border border-line bg-field px-2.5 py-1.5 text-muted hover:text-ink">{t('nav.bag')}</a>
-      </div>
+  <Fragment slot="topbar">
+    {maxFetched > 0 && <Freshness epoch={maxFetched} lang={lang} client:only="svelte" />}
+    <a href={bagHref} class="rounded-md border border-line bg-field px-2.5 py-1.5 text-muted hover:text-ink">{t('nav.bag')}</a>
+  </Fragment>
+
+  <main class="px-5 py-4">
+    <header class="mb-4">
+      <h1 class="display text-2xl font-semibold text-ink">{t('mercado.title')}</h1>
+      <p class="mt-1 text-sm text-muted">{items.length} {t('mercado.items')}. {t('mercado.subtitle')}</p>
     </header>
 
     <MercadoTable client:only="svelte" items={items} msgs={tableMsgs} />

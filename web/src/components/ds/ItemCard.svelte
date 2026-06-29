@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { type Currency, currencySymbol, delta24, deltaColor, fmtAbbr, fmtPrice, iconUrl, priceOf } from '../../lib/format.ts';
+  import { type Currency, currencySymbol, delta24, deltaColor, fmtAbbr, fmtPrice, iconUrl, priceOf, steamUrl } from '../../lib/format.ts';
   import { gradeColor } from '../../lib/grades.ts';
   import type { MarketLike } from '../../lib/market.ts';
   import Badge from './Badge.svelte';
@@ -70,8 +70,21 @@
     </div>
   </div>
 
-  <div class="flex justify-between border-t border-line-soft pt-[10px] text-[11.5px] text-hint">
+  <div class="flex items-center justify-between border-t border-line-soft pt-[10px] text-[11.5px] text-hint">
     <span>Gold <b class="tabular text-[#cdd3dd]" title={`${item.gold} gold`}>{fmtAbbr(item.gold)}</b></span>
-    <span>Preço <b class="tabular text-[#cdd3dd]">{fmtPrice(price, currency)}</b></span>
+    <span class="flex items-center gap-2">
+      <span>Preço <b class="tabular text-[#cdd3dd]">{fmtPrice(price, currency)}</b></span>
+      {#if item.tradable}
+        <a
+          href={steamUrl(item.name)}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="abrir no Mercado Steam"
+          aria-label="abrir no Mercado Steam"
+          class="rounded border border-line px-1.5 py-0.5 text-[10px] text-muted hover:border-accent-bright hover:text-ink"
+          onclick={(e) => e.stopPropagation()}
+        >↗ Steam</a>
+      {/if}
+    </span>
   </div>
 </article>

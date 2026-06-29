@@ -10,6 +10,14 @@ export function iconUrl(icon: string | null | undefined): string | null {
   return icon ? `${ICON_BASE}${encodeURIComponent(icon)}.png` : null;
 }
 
+// appid do Task Bar Hero no Mercado Steam (portado do legado).
+const STEAM_APPID = 3678970;
+
+/** Link da listagem do item no Mercado Steam (market_hash_name = name). */
+export function steamUrl(name: string): string {
+  return `https://steamcommunity.com/market/listings/${STEAM_APPID}/${encodeURIComponent(name)}`;
+}
+
 /** Símbolo da moeda. */
 export function currencySymbol(cur: Currency): string {
   return cur === 'brl' ? 'R$' : '$';

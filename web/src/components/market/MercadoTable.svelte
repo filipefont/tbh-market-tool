@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { type Currency, deltaColor, fmtAbbr, fmtPrice, iconUrl } from '../../lib/format.ts';
+  import { type Currency, deltaColor, fmtAbbr, fmtPrice, iconUrl, steamUrl } from '../../lib/format.ts';
   import { gradeColor } from '../../lib/grades.ts';
   import { attrLabel } from '../../lib/labels.ts';
   import { type MarketLike, type MarketRow, deriveRows } from '../../lib/market.ts';
@@ -147,8 +147,8 @@
 </script>
 
 <div class="space-y-3">
-  <!-- controles de apresentação -->
-  <div class="flex flex-wrap items-center gap-2">
+  <!-- controles de apresentação (barra centralizada, fiel ao Cubo) -->
+  <div class="flex flex-wrap items-center justify-center gap-2">
     <div class="inline-flex overflow-hidden rounded-md border border-line" role="group">
       <button type="button" aria-pressed={ms.view === 'cards'} onclick={() => viewA.set('cards')} class="px-2.5 py-1.5 text-xs {ms.view === 'cards' ? 'bg-accent text-accent-ink font-semibold' : 'bg-field text-muted hover:bg-row-hover'}">{msgs.viewCards}</button>
       <button type="button" aria-pressed={ms.view === 'table'} onclick={() => viewA.set('table')} class="px-2.5 py-1.5 text-xs {ms.view === 'table' ? 'bg-accent text-accent-ink font-semibold' : 'bg-field text-muted hover:bg-row-hover'}">{msgs.viewTable}</button>
@@ -163,7 +163,7 @@
     <button type="button" onclick={() => sortDirA.set(ms.sortDir === 'asc' ? 'desc' : 'asc')} title="direção" class="rounded-md border border-line bg-field px-2 py-1.5 text-xs text-muted hover:text-ink">{ms.sortDir === 'asc' ? '▲' : '▼'}</button>
 
     <CurrencyToggle value={cur} onchange={(c) => curA.set(c)} />
-    <span class="tabular ml-auto text-xs text-muted">{total} {msgs.items}</span>
+    <span class="tabular text-xs text-muted">· {total} {msgs.items}</span>
   </div>
 
   <!-- top movers -->
@@ -190,7 +190,12 @@
           <img src={iconUrl(best.item.icon)} alt="" class="size-12 flex-none rounded-lg border bg-field object-contain [image-rendering:pixelated]" style:border-color={`${gradeColor(best.grade)}66`} />
           <div class="min-w-0">
             <a href={itemHref(best.name)} class="display block truncate text-[23px] font-semibold text-ink hover:text-accent">{best.item.base || best.name}</a>
-            <div class="mt-1 flex items-center gap-1.5 text-[12.5px] text-hint"><GradeBadge grade={best.grade} />{#if heroSub}<span>· {heroSub}</span>{/if}</div>
+            <div class="mt-1 flex items-center gap-1.5 text-[12.5px] text-hint">
+              <GradeBadge grade={best.grade} />{#if heroSub}<span>· {heroSub}</span>{/if}
+              {#if best.tradable}
+                <a href={steamUrl(best.name)} target="_blank" rel="noopener noreferrer" title="abrir no Mercado Steam" class="rounded border border-line px-1.5 py-0.5 text-[10px] text-muted hover:border-accent-bright hover:text-ink">↗ Steam</a>
+              {/if}
+            </div>
           </div>
         </div>
         <div class="mt-[18px] flex flex-wrap gap-6">
@@ -244,6 +249,9 @@
                     <button type="button" onclick={() => toggleFav(r.name)} title="favoritar" class="flex-none leading-none {isFav(r.name) ? 'text-gold' : 'text-hint hover:text-gold'}">★</button>
                     <img src={iconUrl(r.item.icon)} alt="" loading="lazy" class="size-5 flex-none rounded object-contain [image-rendering:pixelated]" style:border={`1px solid ${gradeColor(r.grade)}55`} />
                     <a href={itemHref(r.name)} class="truncate text-ink hover:text-accent hover:underline">{r.item.base || r.name}</a>
+                    {#if r.tradable}
+                      <a href={steamUrl(r.name)} target="_blank" rel="noopener noreferrer" title="abrir no Mercado Steam" aria-label="abrir no Mercado Steam" class="flex-none text-hint hover:text-accent">↗</a>
+                    {/if}
                   </div>
                   <div class="px-2"><GradeBadge grade={r.grade} /></div>
                   <div class="truncate px-2 text-muted">{r.gearType || '—'}</div>

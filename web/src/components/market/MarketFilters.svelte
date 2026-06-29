@@ -2,7 +2,7 @@
   import { attrLabel } from '../../lib/labels.ts';
   import {
     attrA, clsA, goldMaxA, goldMinA, gradeA, gtypeA, lvlMaxA, lvlMinA, onlyBookA,
-    onlyFavA, onlyTradA, priceMaxA, priceMinA, qA, typeA, clearFilters, wireUrlSync,
+    onlyFavA, onlyTradA, priceMaxA, priceMinA, typeA, clearFilters, wireUrlSync,
   } from '../../lib/stores/market.ts';
   import { ms } from '../../lib/stores/marketState.svelte.ts';
   import MultiSelect from '../ds/MultiSelect.svelte';
@@ -46,8 +46,6 @@
 </script>
 
 <div class="space-y-2">
-  <input type="search" value={ms.q} oninput={(e) => qA.set(e.currentTarget.value)} placeholder={msgs.search} class={fld} />
-
   <MultiSelect label={msgs.allGrades} options={options.grades} selected={ms.grade} onchange={(v) => gradeA.set(v)} fmt={titleCase} />
   <MultiSelect label={msgs.allTypes} options={options.types} selected={ms.type} onchange={(v) => typeA.set(v)} fmt={titleCase} />
   <MultiSelect label={msgs.allGearTypes} options={options.gtypes} selected={ms.gtype} onchange={(v) => gtypeA.set(v)} fmt={titleCase} />

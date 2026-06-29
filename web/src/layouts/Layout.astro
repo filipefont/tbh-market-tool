@@ -73,6 +73,7 @@ const alternates = LOCALIZED.has(path)
       {
         nav && (
           <CuboSidebar>
+            <slot name="search" slot="search" />
             <slot name="filters" slot="filters" />
           </CuboSidebar>
         )

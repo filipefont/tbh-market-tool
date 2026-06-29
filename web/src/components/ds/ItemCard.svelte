@@ -1,13 +1,14 @@
 <script lang="ts">
-  import { type Currency, currencySymbol, delta24, fmtAbbr, fmtPrice, iconUrl, priceOf } from '../../lib/format.ts';
+  import { type Currency, currencySymbol, delta24, deltaColor, fmtAbbr, fmtPrice, iconUrl, priceOf } from '../../lib/format.ts';
   import { gradeColor } from '../../lib/grades.ts';
   import type { MarketLike } from '../../lib/market.ts';
   import Badge from './Badge.svelte';
   import Delta from './Delta.svelte';
   import GradeBadge from './GradeBadge.svelte';
+  import Sparkline from './Sparkline.svelte';
 
-  // Card do Cubo (fiel a .cubocard: border-top da grade, display Space Grotesk,
-  // métrica gold/moeda em destaque, rodapé Gold · Preço em mono).
+  // Card do Cubo (fiel a .cubocard): border-top da grade, nome limpo + sub
+  // grade·tipo·lvl, métrica gold/moeda em Space Grotesk, sparkline, rodapé mono.
   interface Props {
     item: MarketLike;
     rank?: number;
@@ -21,6 +22,12 @@
   const price = $derived(priceOf(item, currency));
   const goldPer = $derived(price && price > 0 ? Math.round(item.gold / price) : null);
   const liq = $derived(item.listings >= 20 ? '#5fd38d' : item.listings >= 5 ? '#f4c430' : '#e07a7a');
+  const titleCase = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+  const sub = $derived(
+    [item.gearType ? titleCase(item.gearType) : null, item.level != null ? `lvl ${item.level}` : null]
+      .filter(Boolean)
+      .join(' · '),
+  );
 </script>
 
 <article
@@ -36,11 +43,11 @@
       style:border-color={`${color}66`}
     />
     <div class="min-w-0 flex-1">
-      <div class="display truncate text-[15px] font-semibold text-ink">{item.name}</div>
-      <div class="mt-1 flex items-center gap-1.5 text-[11.5px]">
+      <div class="display truncate text-[15px] font-semibold text-ink">{item.base || item.name}</div>
+      <div class="mt-1 flex items-center gap-1.5 text-[11.5px] text-hint">
         <GradeBadge grade={item.grade} />
-        {#if item.gradeLock}<Badge variant="lock" title="intradável pela trava de grade">🔒</Badge>{/if}
-        {#if !item.tradable}<Badge variant="lock">intradável</Badge>{/if}
+        {#if sub}<span class="truncate">· {sub}</span>{/if}
+        {#if item.gradeLock}<Badge variant="lock" title="intradável">🔒</Badge>{/if}
       </div>
     </div>
     <div class="flex flex-none flex-col items-end gap-1.5">
@@ -57,7 +64,10 @@
       <div class="display text-[25px] leading-none font-bold text-accent">{fmtAbbr(goldPer)}</div>
       <div class="mt-[3px] text-[10.5px] text-hint">gold / {currencySymbol(currency)}</div>
     </div>
-    <Delta pct={delta24(item)} />
+    <div class="flex flex-col items-end gap-1">
+      <Sparkline values={item.spark} color={deltaColor(delta24(item))} />
+      <Delta pct={delta24(item)} />
+    </div>
   </div>
 
   <div class="flex justify-between border-t border-line-soft pt-[10px] text-[11.5px] text-hint">

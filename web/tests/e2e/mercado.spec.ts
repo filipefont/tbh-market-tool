@@ -36,6 +36,20 @@ test('Mercado: faceta multi-seleção e favoritos', async ({ page }) => {
   await expect(page.locator('a[href*="/item/"]').first()).toBeVisible();
 });
 
+test('Mercado: filtro na SIDEBAR reflete na tabela (cross-island)', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.getByRole('button', { name: /R\$ BRL/ })).toBeVisible();
+  const count = page.locator('span.tabular', { hasText: /itens/ }).last();
+  await expect(count).toHaveText(/\d+ itens/);
+  const before = await count.textContent();
+
+  // toggle "com encomenda" na sidebar (determinístico: muda a contagem em qualquer dataset)
+  await page.locator('label', { hasText: 'com encomenda' }).getByRole('checkbox').check();
+
+  await expect(count).not.toHaveText(before ?? ''); // a contagem do main mudou
+  await expect(page).toHaveURL(/book=1/); // estado refletido na URL
+});
+
 test('Mercado: filtro por atributo adiciona coluna dinâmica', async ({ page }) => {
   await page.goto('./');
   await expect(page.getByRole('button', { name: /R\$ BRL/ })).toBeVisible();

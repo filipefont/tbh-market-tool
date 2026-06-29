@@ -6,6 +6,7 @@ import { type Currency, priceOf } from './format.ts';
 export type MarketLike = Pick<
   MarketItem,
   | 'name'
+  | 'base'
   | 'key'
   | 'grade'
   | 'gradeRank'
@@ -24,7 +25,10 @@ export type MarketLike = Pick<
   | 'book'
   | 'gradeLock'
   | 'tradable'
->;
+> & {
+  /** série compacta de preços (últimos pontos) p/ o mini-gráfico. */
+  spark?: number[];
+};
 
 // Taxa da Steam aplicada ao vender numa encomenda (buy order) — o vendedor recebe
 // o líquido. Espelha o "−15%" do legado.

@@ -73,7 +73,7 @@ jobs:
       # dados-base (bulk + history.db + enriched + orderbook antigo p/ o TTL) p/ os shards e o finalize
       # usarem EXATAMENTE o mesmo snapshot -> a lista de candidatos das encomendas é idêntica entre eles.
       - name: Empacota dados-base
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: data-base
           path: data
@@ -110,7 +110,7 @@ jobs:
           --orderbook-out shards/ob-${{ matrix.shard }}.json
 
       - name: Sobe o parcial do shard
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ob-shard-${{ matrix.shard }}
           path: shards/ob-${{ matrix.shard }}.json

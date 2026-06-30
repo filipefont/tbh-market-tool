@@ -96,7 +96,7 @@ jobs:
           python-version: "3.12"
 
       - name: Baixa dados-base
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: data-base
           path: data
@@ -142,14 +142,14 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Baixa dados-base
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: data-base
           path: data
 
       # junta todos os parciais ob-shard-* em ./shards (merge-multiple achata os artifacts num só dir)
       - name: Baixa parciais dos shards
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: ob-shard-*
           path: shards

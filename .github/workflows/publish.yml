@@ -135,7 +135,7 @@ jobs:
 
       # Node p/ validar o app.js legado (node --check) E buildar o front novo (Astro) em /next/.
       # Astro exige Node >=22.12; o cache acelera o `npm ci` do web/.
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: "npm"

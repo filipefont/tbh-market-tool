@@ -1,5 +1,11 @@
 # TBH Market Tool
 
+> [!IMPORTANT]
+> **Projeto encerrado (novembro de 2026).** O site público foi tirado do ar e a coleta automática
+> de preços parou. A última atualização de dados foi em **17/11/2026**. O código fica disponível
+> só para consulta, sem manutenção. Ele ainda roda localmente (`python3 build.py serve`), mas
+> mudanças na Steam ou na wiki podem quebrá-lo.
+
 Cruza os itens do jogo (Task Bar Hero) com os preços do mercado Steam para ranquear
 o retorno em **gold** (venda no NPC) e em **gold por dinheiro real** (gold/$, gold/R$).
 
@@ -123,12 +129,14 @@ O modo servidor foi desenhado para não comprometer a máquina nem as APIs consu
   reconsultados antes do frescor expirar).
 - **Anti-XSS**: nomes são escapados no render e o JSON embutido neutraliza `</script>`.
 
-## Publicação (GitHub Pages)
+## Publicação (GitHub Pages) — desativada
 
-Site online: **https://filipefont.github.io/tbh-market-tool/**
+O site (`https://filipefont.github.io/tbh-market-tool/`) **foi tirado do ar** quando o projeto foi
+encerrado, e o workflow de publicação está desativado. A descrição abaixo fica como registro de
+como funcionava:
 
-- Publicado automaticamente pelo workflow `.github/workflows/publish.yml` — a cada push na
-  `main`, a cada 2h (cron) e sob demanda (botão **Run workflow**).
+- Era publicado automaticamente pelo workflow `.github/workflows/publish.yml` — a cada push na
+  `main`, de hora em hora (cron) e sob demanda (botão **Run workflow**).
 - A Action faz `--refresh` (bulk) + `--enrich-top` (preço real do topo) e gera o site com
   `--public`. O build público é **somente leitura**: não expõe os botões de atualização
   (esses só existem no `serve` local) e mostra o **horário da última atualização**.
